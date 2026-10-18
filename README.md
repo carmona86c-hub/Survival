@@ -10,13 +10,25 @@ IA autónoma que busca **cualquier forma legal** de ganar dinero y la ejecuta de
 5. **Solo pide firma** en lo que legalmente exige a una persona real (identidad, cuentas, cobros, contratos, impuestos).
 6. **Supervivencia**: cada ciclo cuesta dinero; si se queda sin capital, se apaga.
 
-Las normas fijas están en `normas.js`.
+Las normas fijas están en `normas.js`. El código está en `js/`: `nucleo.js` (estado, sincronización y cerebro), `agente.js` (búsqueda, I+D, planes y ejecución), `apps.js` (fábrica de apps), `comercial.js` (clientes, verificador y supervisión) y `ui.js` (ciclo e interfaz).
 
 ## Estado actual: modo pruebas
 Piensa, investiga en internet y desarrolla entregables, pero **no ejecuta nada real** (ni pagos, ni registros, ni publicaciones). El capital es simulado.
 
 ## Ciclo
-Explorar → Evaluar → Planificar → Ejecutar paso a paso → Preparar firmas → Aprender.
+Explorar → Estudiar (I+D) → Planificar → Ejecutar paso a paso → Preparar firmas → Aprender.
+
+## Centro de I+D
+Cada oportunidad, antes de empezar, la estudia un grupo de especialistas en paralelo: mercado y demanda, técnico, legal y fiscal, comercial y finanzas; en apps, además, producto y experiencia de usuario, y posicionamiento en la tienda (ASO) y monetización. Cada uno da conclusiones, datos con fuente, riesgos y su veredicto. Un director decide qué conviene más en tus circunstancias, o lo descarta, y redacta el plan de estudio y desarrollo: especificación, objetivos, hitos con criterio de terminado, métricas y riesgos con su mitigación. El plan del proyecto se construye a partir de ese estudio.
+
+## Radar de Play Store
+Busca qué apps se piden o hacen falta: categorías de Google Play, quejas repetidas en reseñas, peticiones en foros y Reddit, colectivos con necesidades sin cubrir y apps malas, caras o abandonadas. Alterna con la búsqueda general, o lo hace a la vez si hay hueco.
+
+## Fábrica de apps
+Programa la app siguiendo la especificación del estudio. Después la **ejecuta de verdad** en un entorno aislado, pulsa sus botones y recoge los errores. Un equipo de calidad la revisa frente a la especificación y se corrige automáticamente, en hasta 3 rondas. El resultado de cada ronda queda en el proyecto. Escribe también la ficha de Play Store y la política de privacidad, y la sube a un repo privado de tu GitHub con un flujo que compila el APK (para probar) y el AAB (para Play Store). A ti te queda en "Firmas" la publicación paso a paso.
+
+## Supervisión
+Ella redacta todos los escritos: mensajes a empresas, respuestas a clientes, presupuestos, contratos y anuncios. Tú los ves antes de que salga nada: puedes editarlos a mano o pedirle cambios con tus palabras ("más corto", "añade pago a 30 días") y los rehace, pasando de nuevo por el verificador. Nada sale sin tu conformidad.
 
 ## Exhaustividad
 Cada plan debe cubrir las 14 fases de `FASES` (normas.js): investigación, viabilidad, requisitos legales y fiscales, desarrollo, pruebas, material comercial, captación, seguimiento, negociación, entrega, facturación y cobro, obligaciones fiscales, posventa y aprendizaje. Un revisor independiente repasa cada plan y añade lo que falte antes de empezar.
@@ -28,19 +40,17 @@ No inventa nada. Solo ofrece lo que puede entregar de verdad (lista de CAPACIDAD
 No solo empresas: también autónomos, asociaciones, particulares, administraciones (licitaciones y subvenciones) y plataformas o marketplaces. A empresas y profesionales se les escribe por su contacto público; a particulares se les llega donde buscan (anuncios, tiendas, plataformas) o respondiendo a lo que han publicado. Anuncios, licitaciones y respuestas públicas van a "Firmas" porque se publican a tu nombre.
 
 ## Comercial
-En la fase de captación busca clientes reales a las que la oferta les resuelva un problema, investiga su negocio, encuentra su contacto profesional y redacta un mensaje personalizado. Tú lo apruebas y se abre tu correo con todo escrito. Hace hasta 2 seguimientos y no insiste más. Cuando pegas una respuesta, prepara la contestación y los documentos (presupuesto, contrato, factura) con tus datos. Cumple LSSI y RGPD: nada masivo, remitente identificado y opción de baja.
+En la fase de captación busca clientes reales a los que la oferta les resuelva un problema, investiga su negocio, encuentra su contacto profesional y redacta un mensaje personalizado. Tú lo apruebas y se abre tu correo con todo escrito. Hace hasta 2 seguimientos y no insiste más. Cuando pegas una respuesta, prepara la contestación y los documentos (presupuesto, contrato, factura) con tus datos. Cumple LSSI y RGPD: nada masivo, remitente identificado y opción de baja.
 
 ## Paralelo
-Trabaja en varias tareas a la vez por ciclo (ajustable de 1 a 6): proyectos, seguimientos y respuestas.
-
-## Generador de apps
-Cuando un proyecto consiste en una app, la programa entera (web app en `www/`), escribe la ficha de Play Store y la política de privacidad, y la sube a un repo privado de tu GitHub. Ese repo incluye un flujo de GitHub Actions que compila el APK (para probar) y el AAB (para Play Store) en cada cambio. A ti te queda en "Firmas" la publicación paso a paso.
+Trabaja en varias tareas a la vez por ciclo (ajustable de 1 a 6): proyectos, estudios, seguimientos y respuestas.
 
 ## Sincronización
 Con un token de GitHub (permisos `gist`, `repo`, `workflow`) el estado se guarda en un Gist privado: mismo estado en el móvil y en el ordenador.
 
 ## Uso
-1. Abre la app (GitHub Pages) y pon tu clave API de Anthropic en **Ajustes** (se guarda solo en tu dispositivo).
-2. Pulsa **Ejecutar un ciclo** o activa el **modo continuo**.
+1. Activa GitHub Pages (Settings → Pages → rama `main`) y abre carmona86c-hub.github.io/Survival.
+2. Pon tu clave API de Anthropic en **Ajustes** (se guarda solo en tu dispositivo).
+3. Pulsa **Ejecutar un ciclo** o activa el **modo continuo**.
 
 La documentación fiscal es un borrador: debe revisarla un gestor antes de presentarla.
