@@ -21,8 +21,14 @@ Explorar → Evaluar → Planificar → Ejecutar paso a paso → Preparar firmas
 ## Exhaustividad
 Cada plan debe cubrir las 14 fases de `FASES` (normas.js): investigación, viabilidad, requisitos legales y fiscales, desarrollo, pruebas, material comercial, captación, seguimiento, negociación, entrega, facturación y cobro, obligaciones fiscales, posventa y aprendizaje. Un revisor independiente repasa cada plan y añade lo que falte antes de empezar.
 
+## Veracidad
+No inventa nada. Solo ofrece lo que puede entregar de verdad (lista de CAPACIDADES en `normas.js`) o lo que el dueño hace en persona. Cada oportunidad lleva fuentes y la prueba de que hay demanda; las que no se pueden entregar se descartan y las que no tienen fuentes pesan la mitad. Un verificador revisa todo lo que sale hacia fuera (mensajes, seguimientos, respuestas, anuncios, fichas de apps) y corrige o rechaza promesas imposibles, datos sin comprobar, clientes o testimonios inventados.
+
+## Cualquier cliente, cualquier canal
+No solo empresas: también autónomos, asociaciones, particulares, administraciones (licitaciones y subvenciones) y plataformas o marketplaces. A empresas y profesionales se les escribe por su contacto público; a particulares se les llega donde buscan (anuncios, tiendas, plataformas) o respondiendo a lo que han publicado. Anuncios, licitaciones y respuestas públicas van a "Firmas" porque se publican a tu nombre.
+
 ## Comercial
-En la fase de captación busca empresas reales a las que la oferta les resuelva un problema, investiga su negocio, encuentra su contacto profesional y redacta un mensaje personalizado. Tú lo apruebas y se abre tu correo con todo escrito. Hace hasta 2 seguimientos y no insiste más. Cuando pegas una respuesta, prepara la contestación y los documentos (presupuesto, contrato, factura) con tus datos. Cumple LSSI y RGPD: nada masivo, remitente identificado y opción de baja.
+En la fase de captación busca clientes reales a las que la oferta les resuelva un problema, investiga su negocio, encuentra su contacto profesional y redacta un mensaje personalizado. Tú lo apruebas y se abre tu correo con todo escrito. Hace hasta 2 seguimientos y no insiste más. Cuando pegas una respuesta, prepara la contestación y los documentos (presupuesto, contrato, factura) con tus datos. Cumple LSSI y RGPD: nada masivo, remitente identificado y opción de baja.
 
 ## Paralelo
 Trabaja en varias tareas a la vez por ciclo (ajustable de 1 a 6): proyectos, seguimientos y respuestas.

@@ -91,6 +91,10 @@ Debe ser una web app (HTML, CSS y JavaScript sin dependencias externas ni servid
 Incluye también: "ficha" para Play Store (titulo ≤30, descripcion_corta ≤80, descripcion_larga, categoria, precio_eur, palabras_clave) y "privacidad" (política de privacidad completa en español).
 Devuelve JSON: {"nombre","app_id":"com.survival.algo","resumen","archivos":[{"ruta":"www/index.html","contenido":"..."}],"ficha":{...},"privacidad":"..."}`, { max: 16000 });
   const nombre = r.nombre || pr.titulo, appId = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/.test(r.app_id) ? r.app_id : 'com.survival.' + slug(nombre).replace(/-/g, '');
+  if (r.ficha?.descripcion_larga) {
+    const [v] = await verificar([{ asunto: r.ficha.titulo, cuerpo: r.ficha.descripcion_larga }], `App «${r.nombre}». Lo que hace de verdad: ${r.resumen}. Archivos: ${(r.archivos || []).map(a => a.ruta).join(', ')}`);
+    if (v) r.ficha.descripcion_larga = v.cuerpo;
+  }
   const archivos = (r.archivos || []).filter(a => a.ruta && a.contenido);
   archivos.push(
     { ruta: '.github/workflows/android.yml', contenido: workflowAndroid(nombre, appId) },
@@ -169,14 +173,19 @@ function extraerJSON(t) {
 async function explorar() {
   msg('Buscando oportunidades…');
   const ya = S.oportunidades.map(o => o.titulo).join('; ') || 'ninguna';
-  const r = await pensar(`Investiga en internet oportunidades ACTUALES y legales para ganar dinero, en cualquier ámbito (no solo bolsa). Ya conocidas (no repetir): ${ya}.
-Devuelve un array JSON de 3 oportunidades: [{"titulo","tipo","descripcion","inversion_eur":número,"ingreso_mensual_eur":número,"plazo_dias":número,"riesgo":"bajo|medio|alto","probabilidad":0-1,"requiere_firma":["..."],"fuentes":["url"]}]`, { buscar: true });
+  const r = await pensar(`Investiga en internet oportunidades ACTUALES y legales para generar ingresos, en cualquier ámbito y para cualquier tipo de cliente: empresas, autónomos, particulares, administraciones (licitaciones, subvenciones), plataformas y marketplaces, contenido, productos digitales, inversión… Ya conocidas (no repetir): ${ya}.
+Solo oportunidades con demanda REAL comprobada (fuentes concretas) y que puedas entregar con tus CAPACIDADES REALES más lo que el dueño pueda hacer. No infles cifras: si no hay datos, estima a la baja y dilo.
+Devuelve un array JSON de 3 oportunidades: [{"titulo","tipo","clientes":"a quién se vende","canal":"cómo se llega a ellos","descripcion","inversion_eur":número,"ingreso_mensual_eur":número,"plazo_dias":número,"riesgo":"bajo|medio|alto","probabilidad":0-1,"evidencia_demanda":"qué demuestra que hay demanda","puedes_entregarlo":true|false,"necesita_del_dueno":["..."],"requiere_firma":["..."],"fuentes":["url"]}]`, { buscar: true, max: 6000 });
+  let n = 0;
   (Array.isArray(r) ? r : []).forEach(o => {
+    if (o.puedes_entregarlo === false) { log('evaluar', 'Descartada (no se puede entregar de verdad): ' + o.titulo); return; }
+    if (!o.titulo || S.oportunidades.some(x => x.titulo.toLowerCase() === o.titulo.toLowerCase())) return;
     o.id = uid(); o.estado = 'nueva';
-    o.puntuacion = Math.round(((o.ingreso_mensual_eur || 0) * 6 * (o.probabilidad || 0.3) - (o.inversion_eur || 0)) / Math.max(1, o.plazo_dias || 30) * 10) / 10;
-    S.oportunidades.push(o);
+    const fiable = (o.fuentes || []).filter(f => /^https?:\/\//.test(f)).length ? 1 : 0.5; // sin fuentes, pesa la mitad
+    o.puntuacion = Math.round(((o.ingreso_mensual_eur || 0) * 6 * (o.probabilidad || 0.3) * fiable - (o.inversion_eur || 0)) / Math.max(1, o.plazo_dias || 30) * 10) / 10;
+    S.oportunidades.push(o); n++;
   });
-  log('explorar', `Encontradas ${r.length || 0} oportunidades`);
+  log('explorar', `Encontradas ${n} oportunidades válidas`);
 }
 
 async function planificar(o) {
@@ -243,30 +252,66 @@ Devuelve JSON: {"valoracion":"viable|dudoso|descartar","lecciones":["..."]}`);
 
 // ---------- Comercial: buscar empresas, ofrecer, seguir y responder ----------
 const emailOk = e => /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(e || '');
+// Verificador: nada sale hacia fuera sin comprobar que no promete ni inventa nada.
+async function verificar(piezas, contexto) {
+  if (!piezas.length) return piezas;
+  try {
+    const r = await pensar(`Eres el verificador de veracidad. Revisa cada texto que va a salir hacia clientes o plataformas en nombre del dueño. Contexto real del proyecto: ${contexto}
+Detecta y CORRIGE: promesas que no se puedan cumplir con las CAPACIDADES REALES o el dueño; clientes, casos, testimonios, experiencia, cifras, garantías o plazos inventados; datos sobre el destinatario no comprobados; tono engañoso o agresivo; falta de la línea de baja en mensajes a empresas. Si un texto no se puede salvar, márcalo como rechazado.
+Textos: ${JSON.stringify(piezas.map((p, i) => ({ i, asunto: p.asunto, cuerpo: p.cuerpo })))}
+Devuelve JSON: [{"i":número,"ok":true|false,"asunto","cuerpo","problemas":["..."]}]`, { max: 8000 });
+    return piezas.map((p, i) => {
+      const v = (Array.isArray(r) ? r : []).find(x => x.i === i);
+      if (!v) return { ...p, verificado: false };
+      return v.ok === false && !v.cuerpo ? null : { ...p, asunto: v.asunto || p.asunto, cuerpo: v.cuerpo || p.cuerpo, verificado: true, problemas: v.problemas || [] };
+    }).filter(Boolean);
+  } catch (e) { log('error', 'Verificación: ' + e.message); return piezas.map(p => ({ ...p, verificado: false })); }
+}
+const contextoPr = pr => JSON.stringify({ titulo: pr.titulo, objetivo: pr.plan.objetivo, hecho_hasta_ahora: pr.entregables.map(e => e.resumen), app: pr.app?.nombre || null });
+
 async function captar(pr, paso) {
-  msg(`Buscando empresas para «${pr.titulo}»…`);
-  const ya = S.contactos.map(c => c.empresa).join('; ') || 'ninguna';
+  msg(`Buscando clientes para «${pr.titulo}»…`);
+  const ya = S.contactos.map(c => c.empresa).join('; ') || 'ninguno';
   const r = await pensar(`Proyecto «${pr.titulo}» (objetivo: ${pr.plan.objetivo}). Paso: ${JSON.stringify(paso)}
-Material ya preparado: ${JSON.stringify(pr.entregables.slice(-4).map(e => e.resumen))}
-Busca en internet 5 empresas o profesionales REALES y concretos (preferiblemente en España) a los que esta oferta les resuelva un problema claro. Ya contactadas, no repetir: ${ya}.
-Para cada una: comprueba su web, encuentra su canal de contacto profesional publicado (email comercial o de contacto, o formulario) y escribe un primer mensaje personalizado que demuestre que conoces su negocio, explique el beneficio concreto, proponga un siguiente paso sencillo (llamada de 15 min o demo) y firme con los datos del dueño. Máximo 150 palabras. Termina con: "Si prefiere no recibir más mensajes, respóndame y no volveré a escribirle."
-Devuelve JSON: [{"empresa","web","sector","ciudad","email","formulario","fuente_contacto":"url donde aparece","por_que_encaja","asunto","cuerpo"}]`, { buscar: true, max: 8000 });
-  let n = 0;
-  (Array.isArray(r) ? r : []).forEach(c => {
-    if (!c.empresa || (!emailOk(c.email) && !c.formulario)) return;
-    if (S.contactos.some(x => x.empresa.toLowerCase() === c.empresa.toLowerCase())) return;
-    S.contactos.push({ id: uid(), prId: pr.id, proyecto: pr.titulo, ...c, email: emailOk(c.email) ? c.email : '', estado: 'borrador', mensajes: [{ tipo: 'inicial', asunto: c.asunto, cuerpo: c.cuerpo }], seguimientos: 0, enviado: 0, respuestas: [] });
-    n++;
+Lo que existe de verdad hasta ahora: ${contextoPr(pr)}
+Busca en internet a quién le puede interesar de verdad, sin limitarte a empresas: empresas, autónomos, profesionales, asociaciones, administraciones (licitaciones o convocatorias abiertas), plataformas o marketplaces donde se compre esto, o peticiones públicas de particulares buscando exactamente este servicio. Ya contactados, no repetir: ${ya}.
+Devuelve hasta 6 objetivos REALES y comprobados. Según el canal:
+- "email" o "formulario" (solo empresas, autónomos, profesionales, asociaciones y organismos, con el contacto profesional que publican): mensaje personalizado, máx. 150 palabras, que muestre que conoces su caso, ofrezca SOLO lo que se puede entregar, proponga un paso sencillo y firme con los datos del dueño. Termina con: "Si prefiere no recibir más mensajes, respóndame y no volveré a escribirle."
+- "plataforma" (marketplace, tienda o anuncio donde los clientes buscan, incluidos particulares): el texto completo del anuncio o ficha.
+- "licitacion" (concurso público o subvención abierta): requisitos, plazo y la propuesta o los documentos a presentar.
+- "respuesta_publica" (alguien ha publicado que busca este servicio): la respuesta a su petición.
+Devuelve JSON: [{"empresa":"nombre del destinatario o plataforma","tipo_cliente","canal","web","sector","ciudad","email","formulario","url":"enlace a la plataforma, licitación o petición","fuente_contacto","por_que_encaja","asunto","cuerpo","plazo":"si aplica"}]`, { buscar: true, max: 10000 });
+  const brutos = (Array.isArray(r) ? r : []).filter(c => c.empresa && c.cuerpo && !S.contactos.some(x => x.empresa.toLowerCase() === c.empresa.toLowerCase()));
+  const buenos = await verificar(brutos, contextoPr(pr));
+  let n = 0, f = 0;
+  buenos.forEach(c => {
+    const clave = c.empresa.toLowerCase();
+    if (S.contactos.some(x => x.empresa.toLowerCase() === clave) || S.firmas.some(x => x.titulo.toLowerCase().endsWith(': ' + clave))) return; // otro proyecto en paralelo ya lo tiene
+    if (['email', 'formulario'].includes(c.canal) || (!c.canal && (emailOk(c.email) || c.formulario))) {
+      if (!emailOk(c.email) && !c.formulario) return;
+      S.contactos.push({ id: uid(), prId: pr.id, proyecto: pr.titulo, ...c, email: emailOk(c.email) ? c.email : '', estado: 'borrador', mensajes: [{ tipo: 'inicial', asunto: c.asunto, cuerpo: c.cuerpo, verificado: c.verificado }], seguimientos: 0, enviado: 0, respuestas: [] });
+      n++;
+    } else {
+      // Plataformas, licitaciones o respuestas públicas: se publican a nombre del dueño, así que van a Firmas.
+      const que = { plataforma: 'Publicar anuncio o ficha', licitacion: 'Presentar a licitación o convocatoria', respuesta_publica: 'Responder a la petición publicada' }[c.canal] || 'Publicar';
+      S.firmas.push({ id: uid(), prId: pr.id, estado: 'pendiente', titulo: `${que}: ${c.empresa}`, donde: c.url || c.web || c.empresa, que_firmar: que + (c.plazo ? ` (plazo: ${c.plazo})` : ''), documento: `${c.asunto ? c.asunto + '\n\n' : ''}${c.cuerpo}\n\nPor qué encaja: ${c.por_que_encaja || ''}\nFuente: ${c.fuente_contacto || c.url || ''}${c.verificado ? '' : '\n⚠ Sin verificar: revísalo con cuidado.'}` });
+      f++;
+    }
   });
-  pr.entregables.push({ paso: paso.accion, tipo: 'contactos', resumen: `${n} empresas encontradas con mensaje personalizado listo para aprobar` });
-  log('comercial', `${pr.titulo}: ${n} empresas listas para contactar`);
+  const desc = brutos.length - buenos.length;
+  pr.entregables.push({ paso: paso.accion, tipo: 'contactos', resumen: `${n} contactos con mensaje listo y ${f} anuncios, licitaciones o respuestas preparados${desc ? `; ${desc} rechazados por el verificador` : ''}` });
+  log('comercial', `${pr.titulo}: ${n} contactos y ${f} publicaciones preparadas, verificadas${desc ? ` (${desc} rechazadas)` : ''}`);
 }
 
 async function seguimiento(c) {
   const ult = c.mensajes[c.mensajes.length - 1];
   const r = await pensar(`Escribe un mensaje de seguimiento (${c.seguimientos + 1} de 2) para ${c.empresa}, que no ha respondido. Mensaje anterior: ${JSON.stringify(ult)}. Breve (máx. 80 palabras), cordial, aporta algo nuevo de valor, sin presionar, mismo hilo ("Re: ..."), con la línea de baja.
 Devuelve JSON: {"asunto","cuerpo"}`);
-  c.mensajes.push({ tipo: 'seguimiento', ...r }); c.estado = 'borrador'; c.seguimientos++;
+  const pr = S.proyectos.find(p => p.id === c.prId);
+  const [v] = await verificar([r], pr ? contextoPr(pr) : c.proyecto);
+  c.seguimientos++;
+  if (!v) { c.estado = 'sin_respuesta'; log('comercial', `Seguimiento a ${c.empresa} rechazado por el verificador; no se insiste`); return; }
+  c.mensajes.push({ tipo: 'seguimiento', ...v }); c.estado = 'borrador';
   log('comercial', `Seguimiento preparado para ${c.empresa}`);
 }
 
@@ -279,7 +324,9 @@ Analiza su interés y prepara TODO lo necesario para el siguiente paso: la respu
 Devuelve JSON: {"interes":"alto|medio|bajo|baja","analisis","siguiente_paso","respuesta":{"asunto","cuerpo"}|null,"documentos":[{"titulo","tipo":"presupuesto|contrato|factura|otro","contenido"}]}`, { max: 8000 });
   resp.procesada = true; resp.analisis = r.analisis;
   if (r.interes === 'baja') { c.estado = 'baja'; log('comercial', `${c.empresa} pidió no recibir más mensajes`); return; }
-  if (r.respuesta) { c.mensajes.push({ tipo: 'respuesta', ...r.respuesta }); c.estado = 'borrador'; }
+  const pr = S.proyectos.find(p => p.id === c.prId);
+  const [v] = r.respuesta ? await verificar([r.respuesta], (pr ? contextoPr(pr) : c.proyecto) + ' · Lo que ha dicho el cliente: ' + resp.texto) : [];
+  if (v) { c.mensajes.push({ tipo: 'respuesta', ...v }); c.estado = 'borrador'; }
   else c.estado = r.interes === 'bajo' ? 'descartado' : 'en_conversacion';
   (r.documentos || []).forEach(d => S.firmas.push({ id: uid(), prId: c.prId, estado: 'pendiente', titulo: `${d.titulo} · ${c.empresa}`, que_firmar: d.tipo, donde: c.empresa, documento: d.contenido }));
   if (/factura/i.test(JSON.stringify(r.documentos || []))) log('hacienda', `Factura preparada para ${c.empresa}: regístrala en Hacienda cuando cobres`);
@@ -364,7 +411,7 @@ function pintar() {
   $('sFirma').textContent = S.firmas.filter(f => f.estado === 'pendiente').length;
 
   $('lOp').innerHTML = S.oportunidades.length ? S.oportunidades.slice().reverse().map(o => `<div class="item"><b>${esc(o.titulo)}</b> <span class="tag">${esc(o.tipo)}</span><span class="tag">${esc(o.estado)}</span><span class="tag">riesgo ${esc(o.riesgo)}</span>
-    <div class="mut">${esc(o.descripcion)}</div><div class="mut">Inversión ${eur(o.inversion_eur || 0)} · Ingreso/mes ${eur(o.ingreso_mensual_eur || 0)} · Prob. ${Math.round((o.probabilidad || 0) * 100)}% · Puntuación ${o.puntuacion}</div></div>`).join('') : 'Aún no ha buscado nada.';
+    <div class="mut">${esc(o.descripcion)}</div>${o.clientes ? `<div class="mut">Clientes: ${esc(o.clientes)} · Canal: ${esc(o.canal)}</div>` : ''}${o.evidencia_demanda ? `<div class="mut">Demanda: ${esc(o.evidencia_demanda)}</div>` : ''}${(o.fuentes || []).length ? `<div class="mut">Fuentes: ${o.fuentes.filter(f => /^https?:/.test(f)).map((f, i) => `<a href="${esc(f)}" target="_blank" style="color:inherit">[${i + 1}]</a>`).join(' ')}</div>` : '<div class="mut w">Sin fuentes</div>'}<div class="mut">Inversión ${eur(o.inversion_eur || 0)} · Ingreso/mes ${eur(o.ingreso_mensual_eur || 0)} · Prob. ${Math.round((o.probabilidad || 0) * 100)}% · Puntuación ${o.puntuacion}</div></div>`).join('') : 'Aún no ha buscado nada.';
 
   $('lPr').innerHTML = S.proyectos.length ? S.proyectos.slice().reverse().map(p => `<div class="item"><b>${esc(p.titulo)}</b> <span class="tag">${esc(p.estado)}${p.valoracion ? ' · ' + esc(p.valoracion) : ''}</span>
     <div class="mut">Paso ${Math.min(p.paso + 1, p.plan.pasos.length)} de ${p.plan.pasos.length} · ${esc(p.plan.objetivo)}</div>
@@ -382,7 +429,8 @@ function pintar() {
     const m = c.mensajes[c.mensajes.length - 1];
     return `<div class="item"><b>${esc(c.empresa)}</b> <span class="tag ${EST[c.estado] || ''}">${esc(c.estado.replace('_', ' '))}</span><span class="tag">${esc(c.proyecto)}</span>
     <div class="mut">${esc(c.sector)} · ${esc(c.ciudad)} · ${c.web ? `<a href="${esc(c.web)}" target="_blank" style="color:inherit">${esc(c.web)}</a>` : ''} · ${esc(c.email || 'formulario web')}</div>
-    <div class="mut">Por qué encaja: ${esc(c.por_que_encaja)}</div>
+    <div class="mut">Por qué encaja: ${esc(c.por_que_encaja)}${c.fuente_contacto ? ` · <a href="${esc(c.fuente_contacto)}" target="_blank" style="color:inherit">fuente del contacto</a>` : ''}</div>
+    <div class="mut">${m.verificado ? '<span class="ok">✔ Verificado: no promete ni inventa nada</span>' : '<span class="w">⚠ Sin verificar: revísalo bien</span>'}${(m.problemas || []).length ? ' · Corregido: ' + esc(m.problemas.join('; ')) : ''}</div>
     <details ${c.estado === 'borrador' ? 'open' : ''}><summary>${esc(m.tipo)}: ${esc(m.asunto)}</summary><pre>${esc(m.cuerpo)}</pre></details>
     ${c.respuestas.map(r => `<div class="mut">↩ Respuesta: ${esc(r.texto.slice(0, 200))}${r.analisis ? '<br>Análisis: ' + esc(r.analisis) : ''}</div>`).join('')}
     <div class="row" style="margin-top:6px">
