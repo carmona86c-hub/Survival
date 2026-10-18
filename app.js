@@ -4,11 +4,129 @@ const KEY = 'survival_state_v1', CFG = 'survival_cfg_v1';
 
 const def = () => ({ capitalIni: 1000, gasto: 0, viva: true, oportunidades: [], proyectos: [], firmas: [], diario: [], lecciones: [], fiscal: [] });
 let S = load(KEY) || def();
-let C = load(CFG) || { key: '', model: 'claude-sonnet-5-5', cap: 1000, pin: 3, pout: 15, min: 10 };
-let ocupado = false, timer = null, wake = null;
+let C = Object.assign({ key: '', model: 'claude-sonnet-5-5', cap: 1000, pin: 3, pout: 15, min: 10, gh: '', gist: '' }, load(CFG) || {});
+let ocupado = false, timer = null, wake = null, syncT = null;
 
 function load(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } }
-function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); localStorage.setItem(CFG, JSON.stringify(C)); } catch (e) {} }
+function save(local = false) {
+  if (!local) S.ts = Date.now();
+  try { localStorage.setItem(KEY, JSON.stringify(S)); localStorage.setItem(CFG, JSON.stringify(C)); } catch (e) {}
+  if (!local) { clearTimeout(syncT); syncT = setTimeout(subirSync, 3000); }
+}
+
+// ---------- GitHub: sincronización móvil ↔ ordenador (Gist privado) ----------
+async function gh(path, opt = {}) {
+  if (!C.gh) throw new Error('Falta el token de GitHub en Ajustes');
+  const r = await fetch('https://api.github.com' + path, { ...opt, headers: { Authorization: 'Bearer ' + C.gh, Accept: 'application/vnd.github+json', ...(opt.body ? { 'Content-Type': 'application/json' } : {}) } });
+  if (r.status === 204) return {};
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error('GitHub: ' + (j.message || r.status));
+  return j;
+}
+function syncTxt(t) { const e = $('sSync'); if (e) e.textContent = t; }
+async function subirSync() {
+  if (!C.gh || !C.gist) return;
+  try { await gh('/gists/' + C.gist, { method: 'PATCH', body: JSON.stringify({ files: { 'survival.json': { content: JSON.stringify(S) } } }) }); syncTxt('Sincronizado ' + new Date().toLocaleTimeString('es-ES')); }
+  catch (e) { syncTxt('Error al sincronizar: ' + e.message); }
+}
+async function bajarSync() {
+  if (!C.gh || !C.gist) return;
+  try {
+    const g = await gh('/gists/' + C.gist);
+    const f = g.files?.['survival.json'];
+    let txt = f?.content;
+    if (f?.truncated) txt = await (await fetch(f.raw_url)).text();
+    const remoto = txt ? JSON.parse(txt) : null;
+    if (remoto && (remoto.ts || 0) > (S.ts || 0)) { S = Object.assign(def(), remoto); save(true); pintar(); syncTxt('Estado actualizado desde la nube'); }
+    else if (!remoto || (S.ts || 0) > (remoto.ts || 0)) subirSync();
+    else syncTxt('Al día');
+  } catch (e) { syncTxt('Error al sincronizar: ' + e.message); }
+}
+async function conectarSync() {
+  C.gh = $('cGh').value.trim(); C.gist = $('cGist').value.trim();
+  try {
+    if (!C.gist) {
+      const g = await gh('/gists', { method: 'POST', body: JSON.stringify({ description: 'Survival · estado sincronizado', public: false, files: { 'survival.json': { content: JSON.stringify(S) } } }) });
+      C.gist = g.id; $('cGist').value = g.id;
+      syncTxt('Creada. Copia este ID de sincronización en tu otro dispositivo: ' + g.id);
+    } else await bajarSync();
+    save(true);
+  } catch (e) { syncTxt('Error: ' + e.message); }
+}
+
+// ---------- Generador de apps (Android / Play Store) ----------
+const esApp = (pr, paso) => paso.tipo === 'crear' && /app|aplicaci|play ?store|android|pwa/i.test(pr.titulo + ' ' + paso.accion + ' ' + (paso.detalle || '') + ' ' + (pr.plan.objetivo || ''));
+const slug = s => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'app';
+
+function workflowAndroid(nombre, appId) {
+  return `name: Compilar Android
+on: [push, workflow_dispatch]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - run: npm init -y && npm i @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6
+      - run: npx cap init "${nombre.replace(/"/g, '')}" "${appId}" --web-dir www
+      - run: npx cap add android && npx cap sync android
+      - run: cd android && chmod +x gradlew && ./gradlew assembleDebug bundleRelease
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: |
+            android/app/build/outputs/apk/debug/*.apk
+            android/app/build/outputs/bundle/release/*.aab
+`;
+}
+
+async function generarApp(pr, paso) {
+  msg('Programando la app de «' + pr.titulo + '»…');
+  const r = await pensar(`Programa una app completa y funcional para el proyecto «${pr.titulo}» (objetivo: ${pr.plan.objetivo}). Paso: ${JSON.stringify(paso)}
+Debe ser una web app (HTML, CSS y JavaScript sin dependencias externas ni servidores) que funcione sin conexión, pensada para el móvil, y que luego se empaquetará para Android con Capacitor. Todo dentro de la carpeta "www/" (www/index.html obligatorio). Calidad de producto real que se pueda vender: útil, pulida, sin texto de relleno.
+Incluye también: "ficha" para Play Store (titulo ≤30, descripcion_corta ≤80, descripcion_larga, categoria, precio_eur, palabras_clave) y "privacidad" (política de privacidad completa en español).
+Devuelve JSON: {"nombre","app_id":"com.survival.algo","resumen","archivos":[{"ruta":"www/index.html","contenido":"..."}],"ficha":{...},"privacidad":"..."}`, { max: 16000 });
+  const nombre = r.nombre || pr.titulo, appId = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/.test(r.app_id) ? r.app_id : 'com.survival.' + slug(nombre).replace(/-/g, '');
+  const archivos = (r.archivos || []).filter(a => a.ruta && a.contenido);
+  archivos.push(
+    { ruta: '.github/workflows/android.yml', contenido: workflowAndroid(nombre, appId) },
+    { ruta: 'PRIVACIDAD.md', contenido: r.privacidad || '' },
+    { ruta: 'FICHA_PLAY_STORE.json', contenido: JSON.stringify(r.ficha || {}, null, 2) },
+    { ruta: 'README.md', contenido: `# ${nombre}\n\n${r.resumen || ''}\n\nGenerada por Survival. Cada cambio compila el APK (pruebas) y el AAB (Play Store) en la pestaña Actions.\n` }
+  );
+  pr.app = { nombre, appId, archivos, ficha: r.ficha, repo: null };
+  pr.entregables.push({ paso: paso.accion, tipo: 'app', resumen: `App «${nombre}» programada (${archivos.length} archivos)`, contenido: archivos.map(a => a.ruta).join('\n') });
+  log('app', `App generada: ${nombre}`);
+  if (C.gh) { try { await subirApp(pr); } catch (e) { log('error', 'Subir app: ' + e.message); } }
+  S.firmas.push({
+    id: uid(), prId: pr.id, estado: 'pendiente', titulo: `Publicar «${nombre}» en Play Store`, donde: 'Google Play Console',
+    que_firmar: 'Cuenta de desarrollador a tu nombre, firma de la app y envío a revisión',
+    documento: `Todo lo técnico está hecho. Lo que te toca a ti:\n1. Crear la cuenta de desarrollador en play.google.com/console (pago único de 25 $ y verificación de identidad).\n2. Descargar el archivo .aab desde la pestaña Actions del repo ${pr.app.repo || '(sube la app a GitHub primero)'}.\n3. Crear la app con el ID ${appId} y activar "Firma de apps de Google Play".\n4. Copiar la ficha (FICHA_PLAY_STORE.json) y pegar la política de privacidad (PRIVACIDAD.md, publícala en una URL, por ejemplo GitHub Pages).\n5. Las cuentas personales nuevas deben hacer una prueba cerrada con testers durante 14 días antes de publicar.\n6. Enviar a revisión.\n\nFicha preparada:\n${JSON.stringify(r.ficha || {}, null, 2)}`
+  });
+}
+
+async function subirApp(pr) {
+  const yo = await gh('/user');
+  let nombre = 'app-' + slug(pr.app.nombre);
+  try { await gh('/repos/' + yo.login + '/' + nombre); nombre += '-' + uid().slice(0, 4); } catch (e) {}
+  const repo = await gh('/user/repos', { method: 'POST', body: JSON.stringify({ name: nombre, private: true, auto_init: true, description: 'App generada por Survival: ' + pr.app.nombre }) });
+  for (const a of pr.app.archivos) {
+    msg('Subiendo ' + a.ruta);
+    await gh(`/repos/${repo.full_name}/contents/${a.ruta.split('/').map(encodeURIComponent).join('/')}`, { method: 'PUT', body: JSON.stringify({ message: 'Survival: ' + a.ruta, content: btoa(unescape(encodeURIComponent(a.contenido))) }) });
+  }
+  pr.app.repo = repo.html_url;
+  log('app', 'Subida a GitHub: ' + repo.html_url);
+  save(); pintar();
+}
+
+async function zipApp(pr) {
+  if (!window.JSZip) { await new Promise((ok, ko) => { const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'; s.onload = ok; s.onerror = ko; document.head.appendChild(s); }); }
+  const z = new JSZip(); pr.app.archivos.forEach(a => z.file(a.ruta, a.contenido));
+  const a = document.createElement('a'); a.href = URL.createObjectURL(await z.generateAsync({ type: 'blob' })); a.download = slug(pr.app.nombre) + '.zip'; a.click();
+}
 const eur = n => (Math.round(n * 100) / 100).toLocaleString('es-ES') + ' €';
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const uid = () => Math.random().toString(36).slice(2, 9);
@@ -77,6 +195,8 @@ Devuelve JSON: {"titulo","que_firmar","documento":"texto completo del documento 
     S.firmas.push({ id: uid(), prId: pr.id, ...d, estado: 'pendiente' });
     pr.entregables.push({ paso: paso.accion, tipo: 'firma', resumen: d.titulo });
     log('firma', `Preparado para firmar: ${d.titulo}`);
+  } else if (esApp(pr, paso) && !pr.app) {
+    await generarApp(pr, paso);
   } else {
     const e = await pensar(`Ejecuta este paso del proyecto «${pr.titulo}» y entrega el resultado completo (código, textos, análisis o lo que corresponda):\n${JSON.stringify(paso)}
 Contexto de pasos previos: ${JSON.stringify(pr.entregables.slice(-3))}
@@ -153,6 +273,7 @@ function pintar() {
 
   $('lPr').innerHTML = S.proyectos.length ? S.proyectos.slice().reverse().map(p => `<div class="item"><b>${esc(p.titulo)}</b> <span class="tag">${esc(p.estado)}${p.valoracion ? ' · ' + esc(p.valoracion) : ''}</span>
     <div class="mut">Paso ${Math.min(p.paso + 1, p.plan.pasos.length)} de ${p.plan.pasos.length} · ${esc(p.plan.objetivo)}</div>
+    ${p.app ? `<div class="row" style="margin:6px 0"><span class="tag ok">📱 ${esc(p.app.nombre)}</span><button class="sec" data-zip="${p.id}">Descargar ZIP</button>${p.app.repo ? `<a class="tag" href="${esc(p.app.repo)}" target="_blank">Ver repo</a>` : `<button class="sec" data-up="${p.id}">Subir a GitHub</button>`}</div>` : ''}
     ${p.entregables.map(e => `<details><summary>${esc(e.paso)} — ${esc(e.resumen)}</summary>${e.contenido ? `<pre>${esc(e.contenido)}</pre>` : ''}</details>`).join('')}</div>`).join('') : 'Ninguno todavía.';
 
   $('lFi').innerHTML = S.firmas.length ? S.firmas.slice().reverse().map(f => `<div class="item"><b>${esc(f.titulo)}</b> <span class="tag ${f.estado === 'pendiente' ? 'w' : 'ok'}">${esc(f.estado)}</span>
@@ -172,15 +293,25 @@ document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => {
   ['op', 'pr', 'fi', 'hc', 'di', 'cf'].forEach(t => $('t-' + t).classList.toggle('hide', t !== b.dataset.t));
 });
 $('lFi').onclick = e => { const f = S.firmas.find(x => x.id === e.target.dataset.f); if (f) { f.estado = e.target.dataset.a; log('firma', f.titulo + ': ' + f.estado); save(); pintar(); } };
+$('lPr').onclick = async e => {
+  const p = S.proyectos.find(x => x.id === (e.target.dataset.zip || e.target.dataset.up)); if (!p) return;
+  try { if (e.target.dataset.zip) await zipApp(p); else { e.target.disabled = true; await subirApp(p); } } catch (err) { msg('Error: ' + err.message); e.target.disabled = false; }
+};
+$('cSync').onclick = conectarSync;
 $('bCiclo').onclick = ciclo; $('bAuto').onclick = toggleAuto;
 $('hAdd').onclick = () => { const imp = parseFloat($('hImp').value); if (!imp) return; S.fiscal.push({ tipo: $('hTipo').value, imp, con: $('hCon').value, fecha: new Date().toLocaleDateString('es-ES') }); $('hImp').value = $('hCon').value = ''; save(); pintar(); };
 $('hDoc').onclick = borradorFiscal;
-['key', 'model', 'cap', 'pin', 'pout', 'min'].forEach(k => $('c' + k[0].toUpperCase() + k.slice(1)).value = C[k]);
+['key', 'model', 'cap', 'pin', 'pout', 'min', 'gh', 'gist'].forEach(k => $('c' + k[0].toUpperCase() + k.slice(1)).value = C[k]);
 $('cSave').onclick = () => {
+  C.gh = $('cGh').value.trim(); C.gist = $('cGist').value.trim();
   C.key = $('cKey').value.trim(); C.model = $('cModel').value.trim(); C.cap = +$('cCap').value; C.pin = +$('cPin').value; C.pout = +$('cPout').value; C.min = +$('cMin').value;
   if (!S.diario.length) S.capitalIni = C.cap; save(); pintar(); msg('Ajustes guardados');
 };
 $('cReset').onclick = () => { if (confirm('¿Borrar todo y empezar de cero?')) { pararAuto(); S = def(); S.capitalIni = C.cap; save(); pintar(); } };
 $('cExp').onclick = () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(S, null, 2)], { type: 'application/json' })); a.download = 'survival-datos.json'; a.click(); };
-document.addEventListener('visibilitychange', async () => { if (timer && document.visibilityState === 'visible') try { wake = await navigator.wakeLock?.request('screen'); } catch (e) {} });
-pintar();
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState !== 'visible') return;
+  if (!ocupado) bajarSync();
+  if (timer) try { wake = await navigator.wakeLock?.request('screen'); } catch (e) {}
+});
+pintar(); bajarSync();

@@ -18,6 +18,12 @@ Piensa, investiga en internet y desarrolla entregables, pero **no ejecuta nada r
 ## Ciclo
 Explorar → Evaluar → Planificar → Ejecutar paso a paso → Preparar firmas → Aprender.
 
+## Generador de apps
+Cuando un proyecto consiste en una app, la programa entera (web app en `www/`), escribe la ficha de Play Store y la política de privacidad, y la sube a un repo privado de tu GitHub. Ese repo incluye un flujo de GitHub Actions que compila el APK (para probar) y el AAB (para Play Store) en cada cambio. A ti te queda en "Firmas" la publicación paso a paso.
+
+## Sincronización
+Con un token de GitHub (permisos `gist`, `repo`, `workflow`) el estado se guarda en un Gist privado: mismo estado en el móvil y en el ordenador.
+
 ## Uso
 1. Abre la app (GitHub Pages) y pon tu clave API de Anthropic en **Ajustes** (se guarda solo en tu dispositivo).
 2. Pulsa **Ejecutar un ciclo** o activa el **modo continuo**.
