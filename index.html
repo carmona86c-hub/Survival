@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Survival</title>
+<style>
+:root{--bg:#0f1115;--card:#181b22;--tx:#e8e8ea;--mut:#9aa0aa;--ac:#4ade80;--warn:#fbbf24;--bad:#f87171;--ln:#2a2f3a}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.45 system-ui,sans-serif;padding:16px;max-width:900px;margin:auto}
+h1{margin:0 0 4px;font-size:24px}h2{font-size:16px;margin:0 0 10px}
+.mut{color:var(--mut);font-size:13px}.card{background:var(--card);border:1px solid var(--ln);border-radius:12px;padding:14px;margin:12px 0}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.stat{background:#11141a;border-radius:10px;padding:10px}.stat b{display:block;font-size:20px}
+button{background:var(--ac);color:#06210f;border:0;border-radius:9px;padding:10px 14px;font-weight:600;cursor:pointer}
+button.sec{background:#2a2f3a;color:var(--tx)}button.bad{background:var(--bad);color:#2a0606}button:disabled{opacity:.5}
+input,select,textarea{background:#11141a;color:var(--tx);border:1px solid var(--ln);border-radius:8px;padding:9px;width:100%;font:inherit}
+label{display:block;font-size:13px;color:var(--mut);margin:8px 0 3px}
+.tabs{display:flex;gap:6px;overflow-x:auto;margin-top:12px}.tabs button{background:#2a2f3a;color:var(--tx);white-space:nowrap}.tabs button.on{background:var(--ac);color:#06210f}
+.item{border-top:1px solid var(--ln);padding:10px 0}.item:first-child{border-top:0}
+.tag{display:inline-block;font-size:11px;padding:2px 7px;border-radius:99px;background:#2a2f3a;margin-right:4px}
+.ok{color:var(--ac)}.w{color:var(--warn)}.b{color:var(--bad)}
+pre{white-space:pre-wrap;word-break:break-word;background:#11141a;padding:10px;border-radius:8px;font-size:12px;max-height:340px;overflow:auto}
+.hide{display:none}
+</style>
+</head>
+<body>
+<h1>Survival</h1>
+<div class="mut">IA autónoma que busca y ejecuta formas legales de ganar dinero. Tú solo firmas.</div>
+
+<div class="card">
+  <div class="grid">
+    <div class="stat"><span class="mut">Estado</span><b id="sEstado">Apagada</b></div>
+    <div class="stat"><span class="mut">Capital (simulado)</span><b id="sCapital">0 €</b></div>
+    <div class="stat"><span class="mut">Gasto en IA</span><b id="sGasto">0 €</b></div>
+    <div class="stat"><span class="mut">Proyectos</span><b id="sProy">0</b></div>
+    <div class="stat"><span class="mut">Pendiente de firma</span><b id="sFirma">0</b></div>
+  </div>
+  <div class="row" style="margin-top:10px">
+    <button id="bCiclo">Ejecutar un ciclo</button>
+    <button id="bAuto" class="sec">Modo continuo: OFF</button>
+    <span class="mut" id="sMsg"></span>
+  </div>
+  <div class="mut" style="margin-top:6px">Modo pruebas: piensa, investiga y desarrolla, pero no hace nada real (ni pagos, ni registros, ni publicaciones).</div>
+</div>
+
+<div class="tabs" id="tabs">
+  <button data-t="op" class="on">Oportunidades</button>
+  <button data-t="pr">Proyectos</button>
+  <button data-t="fi">Firmas</button>
+  <button data-t="hc">Hacienda</button>
+  <button data-t="di">Diario</button>
+  <button data-t="cf">Ajustes</button>
+</div>
+
+<div class="card" id="t-op"><h2>Oportunidades encontradas</h2><div id="lOp" class="mut">Aún no ha buscado nada.</div></div>
+<div class="card hide" id="t-pr"><h2>Proyectos en desarrollo</h2><div id="lPr" class="mut">Ninguno todavía.</div></div>
+<div class="card hide" id="t-fi"><h2>Pendiente de tu firma</h2><div class="mut">Lo que legalmente exige a una persona real. Ella lo deja preparado.</div><div id="lFi"></div></div>
+<div class="card hide" id="t-hc"><h2>Hacienda</h2>
+  <div class="mut">Registro de ingresos y gastos. Genera un borrador de la documentación para que la revise un gestor y tú la firmes.</div>
+  <div class="row" style="margin-top:8px">
+    <select id="hTipo" style="width:auto"><option value="ingreso">Ingreso</option><option value="gasto">Gasto</option></select>
+    <input id="hImp" type="number" placeholder="Importe €" style="width:120px">
+    <input id="hCon" placeholder="Concepto" style="flex:1;min-width:140px">
+    <button id="hAdd" class="sec">Añadir</button>
+  </div>
+  <div id="lHc" style="margin-top:8px"></div>
+  <div class="row" style="margin-top:8px"><button id="hDoc">Preparar borrador fiscal</button></div>
+  <pre id="hOut" class="hide"></pre>
+</div>
+<div class="card hide" id="t-di"><h2>Diario y lecciones aprendidas</h2><div id="lDi" class="mut">Vacío.</div></div>
+<div class="card hide" id="t-cf"><h2>Ajustes</h2>
+  <label>Clave API de Anthropic (se guarda solo en este dispositivo)</label><input id="cKey" type="password" placeholder="sk-ant-...">
+  <label>Modelo</label><input id="cModel" value="claude-sonnet-5-5">
+  <label>Capital simulado inicial (€)</label><input id="cCap" type="number" value="1000">
+  <label>Precio estimado IA: € por millón de tokens de entrada / salida</label>
+  <div class="row"><input id="cPin" type="number" value="3" style="flex:1"><input id="cPout" type="number" value="15" style="flex:1"></div>
+  <label>Minutos entre ciclos en modo continuo</label><input id="cMin" type="number" value="10">
+  <div class="row" style="margin-top:10px"><button id="cSave">Guardar</button><button id="cReset" class="bad">Reiniciar todo</button><button id="cExp" class="sec">Exportar datos</button></div>
+</div>
+
+<script src="normas.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
