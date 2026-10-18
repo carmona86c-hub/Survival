@@ -2,9 +2,10 @@
 const $ = id => document.getElementById(id);
 const KEY = 'survival_state_v1', CFG = 'survival_cfg_v1';
 
-const def = () => ({ capitalIni: 1000, gasto: 0, viva: true, oportunidades: [], proyectos: [], firmas: [], diario: [], lecciones: [], fiscal: [] });
-let S = load(KEY) || def();
-let C = Object.assign({ key: '', model: 'claude-sonnet-5-5', cap: 1000, pin: 3, pout: 15, min: 10, gh: '', gist: '' }, load(CFG) || {});
+const def = () => ({ capitalIni: 1000, gasto: 0, viva: true, oportunidades: [], proyectos: [], firmas: [], diario: [], lecciones: [], fiscal: [], contactos: [], titular: {} });
+let S = Object.assign(def(), load(KEY) || {});
+let C = Object.assign({ key: '', model: 'claude-sonnet-5-5', cap: 1000, pin: 3, pout: 15, min: 10, gh: '', gist: '', par: 3 }, load(CFG) || {});
+const DIAS = 864e5;
 let ocupado = false, timer = null, wake = null, syncT = null;
 
 function load(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } }
@@ -37,7 +38,7 @@ async function bajarSync() {
     let txt = f?.content;
     if (f?.truncated) txt = await (await fetch(f.raw_url)).text();
     const remoto = txt ? JSON.parse(txt) : null;
-    if (remoto && (remoto.ts || 0) > (S.ts || 0)) { S = Object.assign(def(), remoto); save(true); pintar(); syncTxt('Estado actualizado desde la nube'); }
+    if (remoto && (remoto.ts || 0) > (S.ts || 0)) { S = Object.assign(def(), remoto); save(true); pintar(); pintarTit(); syncTxt('Estado actualizado desde la nube'); }
     else if (!remoto || (S.ts || 0) > (remoto.ts || 0)) subirSync();
     else syncTxt('Al día');
   } catch (e) { syncTxt('Error al sincronizar: ' + e.message); }
@@ -139,7 +140,7 @@ async function pensar(instruccion, { buscar = false, max = 4000 } = {}) {
   const lecciones = S.lecciones.slice(0, 15).map(l => '- ' + l).join('\n') || '(ninguna todavía)';
   const body = {
     model: C.model, max_tokens: max,
-    system: NORMAS + '\n\nLECCIONES APRENDIDAS:\n' + lecciones,
+    system: NORMAS + '\n\nDATOS DEL DUEÑO (úsalos en firmas de correo, presupuestos, contratos y facturas; si falta alguno, déjalo como [COMPLETAR]):\n' + titularTxt() + '\n\nLECCIONES APRENDIDAS:\n' + lecciones,
     messages: [{ role: 'user', content: instruccion }]
   };
   if (buscar) body.tools = [{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 }];
@@ -156,6 +157,8 @@ async function pensar(instruccion, { buscar = false, max = 4000 } = {}) {
   const texto = (j.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
   return extraerJSON(texto);
 }
+const CAMPOS_TIT = { nombre: 'Nombre o razón social', nif: 'NIF', direccion: 'Dirección fiscal', email: 'Email', telefono: 'Teléfono', web: 'Web', actividad: 'Situación (particular, autónomo, sociedad)' };
+function titularTxt() { return Object.entries(CAMPOS_TIT).map(([k, l]) => `${l}: ${S.titular?.[k] || '[COMPLETAR]'}`).join('\n'); }
 function extraerJSON(t) {
   const a = t.search(/[\[{]/); const b = Math.max(t.lastIndexOf('}'), t.lastIndexOf(']'));
   if (a < 0 || b < a) throw new Error('Respuesta sin JSON');
@@ -179,12 +182,30 @@ Devuelve un array JSON de 3 oportunidades: [{"titulo","tipo","descripcion","inve
 async function planificar(o) {
   msg('Planificando: ' + o.titulo);
   const p = await pensar(`Elige esta oportunidad y diseña un plan para llevarla a cabo de principio a fin:\n${JSON.stringify(o)}
-Devuelve JSON: {"objetivo","pasos":[{"accion","tipo":"investigar|crear|preparar_documento|publicar|vender|cobrar","autonomo":true|false,"detalle"}],"documentos_fiscales":["..."],"criterio_exito"}
-Marca autonomo:false en todo lo que requiera la identidad, firma o dinero del dueño.`);
+Debe cubrir TODAS estas fases, en orden, con pasos concretos (o un paso que justifique por qué no aplica):
+${FASES.map((f, i) => (i + 1) + '. ' + f).join('\n')}
+Tipos de paso: "investigar", "crear" (programar, diseñar, redactar), "preparar_documento", "contactar" (buscar empresas o clientes concretos y escribirles), "publicar", "vender", "cobrar", "fiscal", "medir".
+Devuelve JSON: {"objetivo","pasos":[{"fase":número,"accion","tipo","autonomo":true|false,"detalle"}],"documentos_fiscales":["..."],"criterio_exito"}
+Marca autonomo:false en todo lo que requiera la identidad, firma o dinero del dueño. Los pasos "contactar" son autonomo:true (tú buscas y redactas; el dueño solo aprueba el envío).`, { max: 8000 });
+  const p2 = await revisarPlan(o, p);
   o.estado = 'en_proyecto';
-  S.proyectos.push({ id: uid(), opId: o.id, titulo: o.titulo, plan: p, paso: 0, entregables: [], estado: 'activo' });
-  log('planificar', `Nuevo proyecto: ${o.titulo} (${p.pasos?.length || 0} pasos)`);
+  S.proyectos.push({ id: uid(), opId: o.id, titulo: o.titulo, plan: p2, paso: 0, entregables: [], estado: 'activo' });
+  log('planificar', `Nuevo proyecto: ${o.titulo} (${p2.pasos?.length || 0} pasos, revisado)`);
 }
+
+// Un segundo "par de ojos": comprueba que no falta ningún paso y lo corrige.
+async function revisarPlan(o, p) {
+  msg('Revisando que el plan no se deje nada: ' + o.titulo);
+  try {
+    const r = await pensar(`Eres el revisor. Comprueba con lupa este plan para «${o.titulo}». Busca pasos que falten, estén en mal orden, sean vagos o se salten requisitos legales, fiscales o comerciales, y fases sin cubrir de esta lista:
+${FASES.map((f, i) => (i + 1) + '. ' + f).join('\n')}
+Plan: ${JSON.stringify(p)}
+Devuelve JSON con el plan COMPLETO corregido: {"objetivo","pasos":[{"fase","accion","tipo","autonomo","detalle"}],"documentos_fiscales":[...],"criterio_exito","cambios":["qué has añadido o corregido"]}`, { max: 8000 });
+    if (Array.isArray(r.pasos) && r.pasos.length >= (p.pasos?.length || 0) * 0.8) { log('revisar', `${o.titulo}: ${(r.cambios || []).length} correcciones`); return r; }
+  } catch (e) { log('error', 'Revisión: ' + e.message); }
+  return p;
+}
+
 
 async function ejecutarPaso(pr) {
   const paso = pr.plan.pasos[pr.paso];
@@ -197,6 +218,8 @@ Devuelve JSON: {"titulo","que_firmar","documento":"texto completo del documento 
     log('firma', `Preparado para firmar: ${d.titulo}`);
   } else if (esApp(pr, paso) && !pr.app) {
     await generarApp(pr, paso);
+  } else if (paso.tipo === 'contactar' || /contact|captaci|clientes? potencial|prospec/i.test(paso.accion)) {
+    await captar(pr, paso);
   } else {
     const e = await pensar(`Ejecuta este paso del proyecto «${pr.titulo}» y entrega el resultado completo (código, textos, análisis o lo que corresponda):\n${JSON.stringify(paso)}
 Contexto de pasos previos: ${JSON.stringify(pr.entregables.slice(-3))}
@@ -218,22 +241,94 @@ Devuelve JSON: {"valoracion":"viable|dudoso|descartar","lecciones":["..."]}`);
   log('aprender', `${pr.titulo}: ${r.valoracion}`);
 }
 
-// ---------- Ciclo: lo justo y necesario ----------
+// ---------- Comercial: buscar empresas, ofrecer, seguir y responder ----------
+const emailOk = e => /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(e || '');
+async function captar(pr, paso) {
+  msg(`Buscando empresas para «${pr.titulo}»…`);
+  const ya = S.contactos.map(c => c.empresa).join('; ') || 'ninguna';
+  const r = await pensar(`Proyecto «${pr.titulo}» (objetivo: ${pr.plan.objetivo}). Paso: ${JSON.stringify(paso)}
+Material ya preparado: ${JSON.stringify(pr.entregables.slice(-4).map(e => e.resumen))}
+Busca en internet 5 empresas o profesionales REALES y concretos (preferiblemente en España) a los que esta oferta les resuelva un problema claro. Ya contactadas, no repetir: ${ya}.
+Para cada una: comprueba su web, encuentra su canal de contacto profesional publicado (email comercial o de contacto, o formulario) y escribe un primer mensaje personalizado que demuestre que conoces su negocio, explique el beneficio concreto, proponga un siguiente paso sencillo (llamada de 15 min o demo) y firme con los datos del dueño. Máximo 150 palabras. Termina con: "Si prefiere no recibir más mensajes, respóndame y no volveré a escribirle."
+Devuelve JSON: [{"empresa","web","sector","ciudad","email","formulario","fuente_contacto":"url donde aparece","por_que_encaja","asunto","cuerpo"}]`, { buscar: true, max: 8000 });
+  let n = 0;
+  (Array.isArray(r) ? r : []).forEach(c => {
+    if (!c.empresa || (!emailOk(c.email) && !c.formulario)) return;
+    if (S.contactos.some(x => x.empresa.toLowerCase() === c.empresa.toLowerCase())) return;
+    S.contactos.push({ id: uid(), prId: pr.id, proyecto: pr.titulo, ...c, email: emailOk(c.email) ? c.email : '', estado: 'borrador', mensajes: [{ tipo: 'inicial', asunto: c.asunto, cuerpo: c.cuerpo }], seguimientos: 0, enviado: 0, respuestas: [] });
+    n++;
+  });
+  pr.entregables.push({ paso: paso.accion, tipo: 'contactos', resumen: `${n} empresas encontradas con mensaje personalizado listo para aprobar` });
+  log('comercial', `${pr.titulo}: ${n} empresas listas para contactar`);
+}
+
+async function seguimiento(c) {
+  const ult = c.mensajes[c.mensajes.length - 1];
+  const r = await pensar(`Escribe un mensaje de seguimiento (${c.seguimientos + 1} de 2) para ${c.empresa}, que no ha respondido. Mensaje anterior: ${JSON.stringify(ult)}. Breve (máx. 80 palabras), cordial, aporta algo nuevo de valor, sin presionar, mismo hilo ("Re: ..."), con la línea de baja.
+Devuelve JSON: {"asunto","cuerpo"}`);
+  c.mensajes.push({ tipo: 'seguimiento', ...r }); c.estado = 'borrador'; c.seguimientos++;
+  log('comercial', `Seguimiento preparado para ${c.empresa}`);
+}
+
+async function procesarRespuesta(c) {
+  const resp = c.respuestas[c.respuestas.length - 1];
+  const r = await pensar(`${c.empresa} ha respondido sobre el proyecto «${c.proyecto}».
+Historial enviado: ${JSON.stringify(c.mensajes)}
+Su respuesta: ${resp.texto}
+Analiza su interés y prepara TODO lo necesario para el siguiente paso: la respuesta por correo y, si hay interés, los documentos (presupuesto detallado con IVA, contrato de prestación de servicios, o factura conforme a la normativa española) con los datos del dueño. Si piden no recibir más mensajes, marca baja.
+Devuelve JSON: {"interes":"alto|medio|bajo|baja","analisis","siguiente_paso","respuesta":{"asunto","cuerpo"}|null,"documentos":[{"titulo","tipo":"presupuesto|contrato|factura|otro","contenido"}]}`, { max: 8000 });
+  resp.procesada = true; resp.analisis = r.analisis;
+  if (r.interes === 'baja') { c.estado = 'baja'; log('comercial', `${c.empresa} pidió no recibir más mensajes`); return; }
+  if (r.respuesta) { c.mensajes.push({ tipo: 'respuesta', ...r.respuesta }); c.estado = 'borrador'; }
+  else c.estado = r.interes === 'bajo' ? 'descartado' : 'en_conversacion';
+  (r.documentos || []).forEach(d => S.firmas.push({ id: uid(), prId: c.prId, estado: 'pendiente', titulo: `${d.titulo} · ${c.empresa}`, que_firmar: d.tipo, donde: c.empresa, documento: d.contenido }));
+  if (/factura/i.test(JSON.stringify(r.documentos || []))) log('hacienda', `Factura preparada para ${c.empresa}: regístrala en Hacienda cuando cobres`);
+  log('comercial', `${c.empresa}: interés ${r.interes}. ${r.siguiente_paso || ''}`);
+}
+
+function tareasComerciales() {
+  const t = [];
+  S.contactos.forEach(c => {
+    if (c.respuestas.some(r => !r.procesada)) t.push(() => procesarRespuesta(c));
+    else if (c.estado === 'enviado' && Date.now() - c.enviado > 5 * DIAS) {
+      if (c.seguimientos < 2) t.push(() => seguimiento(c));
+      else { c.estado = 'sin_respuesta'; log('comercial', `${c.empresa}: sin respuesta tras 2 seguimientos, no se insiste más`); }
+    }
+  });
+  return t;
+}
+
+function enviarContacto(c) {
+  const m = c.mensajes[c.mensajes.length - 1];
+  if (c.email) location.href = `mailto:${c.email}?subject=${encodeURIComponent(m.asunto)}&body=${encodeURIComponent(m.cuerpo)}`;
+  else { navigator.clipboard?.writeText(m.cuerpo).catch(() => {}); window.open(c.formulario, '_blank'); }
+  c.estado = 'enviado'; c.enviado = Date.now(); m.fecha = new Date().toISOString();
+  log('comercial', `Enviado a ${c.empresa} (${m.tipo})`);
+}
+
+// ---------- Ciclo: lo justo y necesario, varias cosas a la vez ----------
 async function ciclo() {
   if (ocupado) return;
   if (!S.viva) { msg('Está apagada: se quedó sin capital. Reinicia en Ajustes.'); return; }
   ocupado = true; $('bCiclo').disabled = true;
   try {
-    const activo = S.proyectos.find(p => p.estado === 'activo');
-    const nuevas = S.oportunidades.filter(o => o.estado === 'nueva').sort((a, b) => b.puntuacion - a.puntuacion);
-    if (activo) await ejecutarPaso(activo);
-    else if (nuevas.length) {
-      const mejor = nuevas[0];
-      if (mejor.puntuacion <= 0) { mejor.estado = 'descartada'; log('evaluar', 'Descartada por poco rentable: ' + mejor.titulo); }
-      else await planificar(mejor);
-    } else await explorar();
+    const par = Math.max(1, C.par || 3);
+    const tareas = tareasComerciales().slice(0, par);
+    const activos = S.proyectos.filter(p => p.estado === 'activo');
+    activos.slice(0, Math.max(0, par - tareas.length)).forEach(p => tareas.push(() => ejecutarPaso(p)));
+    if (activos.length < par && tareas.length < par) {
+      const nuevas = S.oportunidades.filter(o => o.estado === 'nueva').sort((a, b) => b.puntuacion - a.puntuacion);
+      nuevas.filter(o => o.puntuacion <= 0).forEach(o => { o.estado = 'descartada'; log('evaluar', 'Descartada por poco rentable: ' + o.titulo); });
+      const buenas = nuevas.filter(o => o.puntuacion > 0);
+      if (buenas.length) buenas.slice(0, par - activos.length).forEach(o => tareas.push(() => planificar(o)));
+      else tareas.push(explorar);
+    }
+    msg(`Trabajando en ${tareas.length} tarea(s) a la vez…`);
+    const res = await Promise.allSettled(tareas.map(f => f()));
+    res.filter(x => x.status === 'rejected').forEach(x => log('error', x.reason?.message || String(x.reason)));
     if (S.capitalIni - S.gasto <= 0) { S.viva = false; log('apagado', 'Sin capital: la IA se apaga'); pararAuto(); }
-    msg('Ciclo terminado');
+    const errs = res.filter(x => x.status === 'rejected');
+    msg(errs.length ? 'Error: ' + (errs[0].reason?.message || '') : `Ciclo terminado (${tareas.length} tareas)`);
   } catch (e) { log('error', e.message); msg('Error: ' + e.message); }
   ocupado = false; $('bCiclo').disabled = false; save(); pintar();
 }
@@ -281,6 +376,23 @@ function pintar() {
     <details><summary>Ver documento</summary><pre>${esc(f.documento)}</pre></details>
     ${f.estado === 'pendiente' ? `<div class="row"><button data-f="${f.id}" data-a="firmado">Marcar firmado</button><button class="sec" data-f="${f.id}" data-a="rechazado">Rechazar</button></div>` : ''}</div>`).join('') : '<div class="mut">Nada pendiente.</div>';
 
+  const EST = { borrador: 'w', enviado: '', en_conversacion: 'ok', respondido: 'ok', sin_respuesta: 'b', descartado: 'b', baja: 'b' };
+  $('sEnv').textContent = S.contactos.filter(c => c.estado === 'borrador').length;
+  $('lCo').innerHTML = S.contactos.length ? S.contactos.slice().reverse().map(c => {
+    const m = c.mensajes[c.mensajes.length - 1];
+    return `<div class="item"><b>${esc(c.empresa)}</b> <span class="tag ${EST[c.estado] || ''}">${esc(c.estado.replace('_', ' '))}</span><span class="tag">${esc(c.proyecto)}</span>
+    <div class="mut">${esc(c.sector)} · ${esc(c.ciudad)} · ${c.web ? `<a href="${esc(c.web)}" target="_blank" style="color:inherit">${esc(c.web)}</a>` : ''} · ${esc(c.email || 'formulario web')}</div>
+    <div class="mut">Por qué encaja: ${esc(c.por_que_encaja)}</div>
+    <details ${c.estado === 'borrador' ? 'open' : ''}><summary>${esc(m.tipo)}: ${esc(m.asunto)}</summary><pre>${esc(m.cuerpo)}</pre></details>
+    ${c.respuestas.map(r => `<div class="mut">↩ Respuesta: ${esc(r.texto.slice(0, 200))}${r.analisis ? '<br>Análisis: ' + esc(r.analisis) : ''}</div>`).join('')}
+    <div class="row" style="margin-top:6px">
+      ${c.estado === 'borrador' ? `<button data-c="${c.id}" data-a="enviar">Aprobar y enviar</button>` : ''}
+      ${['enviado', 'en_conversacion', 'sin_respuesta'].includes(c.estado) ? `<button class="sec" data-c="${c.id}" data-a="resp">Ha respondido</button>` : ''}
+      ${!['baja', 'descartado'].includes(c.estado) ? `<button class="sec" data-c="${c.id}" data-a="desc">Descartar</button>` : ''}
+    </div>
+    <div class="hide" id="r-${c.id}"><textarea rows="4" placeholder="Pega aquí su respuesta"></textarea><button data-c="${c.id}" data-a="guardar" style="margin-top:6px">Guardar y que prepare el siguiente paso</button></div></div>`;
+  }).join('') : 'Aún no ha contactado con nadie. Lo hará cuando un proyecto llegue a la fase de captación.';
+
   const ing = S.fiscal.filter(m => m.tipo === 'ingreso').reduce((a, m) => a + m.imp, 0), gas = S.fiscal.filter(m => m.tipo === 'gasto').reduce((a, m) => a + m.imp, 0);
   $('lHc').innerHTML = `<div class="mut">Ingresos ${eur(ing)} · Gastos ${eur(gas)} · Beneficio ${eur(ing - gas)}</div>` + S.fiscal.slice().reverse().map(m => `<div class="item">${m.fecha} · ${m.tipo === 'ingreso' ? '<span class="ok">+' : '<span class="b">-'}${eur(m.imp)}</span> · ${esc(m.con)}</div>`).join('');
 
@@ -290,7 +402,7 @@ function pintar() {
 
 document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => {
   document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x === b));
-  ['op', 'pr', 'fi', 'hc', 'di', 'cf'].forEach(t => $('t-' + t).classList.toggle('hide', t !== b.dataset.t));
+  ['op', 'pr', 'co', 'fi', 'hc', 'di', 'cf'].forEach(t => $('t-' + t).classList.toggle('hide', t !== b.dataset.t));
 });
 $('lFi').onclick = e => { const f = S.firmas.find(x => x.id === e.target.dataset.f); if (f) { f.estado = e.target.dataset.a; log('firma', f.titulo + ': ' + f.estado); save(); pintar(); } };
 $('lPr').onclick = async e => {
@@ -298,11 +410,25 @@ $('lPr').onclick = async e => {
   try { if (e.target.dataset.zip) await zipApp(p); else { e.target.disabled = true; await subirApp(p); } } catch (err) { msg('Error: ' + err.message); e.target.disabled = false; }
 };
 $('cSync').onclick = conectarSync;
+$('lCo').onclick = e => {
+  const c = S.contactos.find(x => x.id === e.target.dataset.c); if (!c) return;
+  const a = e.target.dataset.a;
+  if (a === 'enviar') enviarContacto(c);
+  else if (a === 'resp') { $('r-' + c.id).classList.toggle('hide'); return; }
+  else if (a === 'guardar') { const t = $('r-' + c.id).querySelector('textarea').value.trim(); if (!t) return; c.respuestas.push({ texto: t, fecha: new Date().toISOString(), procesada: false }); c.estado = 'respondido'; log('comercial', `Respuesta de ${c.empresa} registrada`); msg('Respuesta guardada: la procesará en el próximo ciclo'); }
+  else if (a === 'desc') { c.estado = 'descartado'; log('comercial', `${c.empresa} descartada`); }
+  save(); pintar();
+};
 $('bCiclo').onclick = ciclo; $('bAuto').onclick = toggleAuto;
 $('hAdd').onclick = () => { const imp = parseFloat($('hImp').value); if (!imp) return; S.fiscal.push({ tipo: $('hTipo').value, imp, con: $('hCon').value, fecha: new Date().toLocaleDateString('es-ES') }); $('hImp').value = $('hCon').value = ''; save(); pintar(); };
 $('hDoc').onclick = borradorFiscal;
-['key', 'model', 'cap', 'pin', 'pout', 'min', 'gh', 'gist'].forEach(k => $('c' + k[0].toUpperCase() + k.slice(1)).value = C[k]);
+['key', 'model', 'cap', 'pin', 'pout', 'min', 'gh', 'gist', 'par'].forEach(k => $('c' + k[0].toUpperCase() + k.slice(1)).value = C[k]);
+$('tit').innerHTML = Object.entries(CAMPOS_TIT).map(([k, l]) => `<label>${l}</label><input data-tit="${k}">`).join('');
+function pintarTit() { document.querySelectorAll('[data-tit]').forEach(i => i.value = S.titular?.[i.dataset.tit] || ''); }
+pintarTit();
 $('cSave').onclick = () => {
+  document.querySelectorAll('[data-tit]').forEach(i => S.titular[i.dataset.tit] = i.value.trim());
+  C.par = Math.min(6, Math.max(1, +$('cPar').value || 3));
   C.gh = $('cGh').value.trim(); C.gist = $('cGist').value.trim();
   C.key = $('cKey').value.trim(); C.model = $('cModel').value.trim(); C.cap = +$('cCap').value; C.pin = +$('cPin').value; C.pout = +$('cPout').value; C.min = +$('cMin').value;
   if (!S.diario.length) S.capitalIni = C.cap; save(); pintar(); msg('Ajustes guardados');

@@ -18,6 +18,15 @@ Piensa, investiga en internet y desarrolla entregables, pero **no ejecuta nada r
 ## Ciclo
 Explorar → Evaluar → Planificar → Ejecutar paso a paso → Preparar firmas → Aprender.
 
+## Exhaustividad
+Cada plan debe cubrir las 14 fases de `FASES` (normas.js): investigación, viabilidad, requisitos legales y fiscales, desarrollo, pruebas, material comercial, captación, seguimiento, negociación, entrega, facturación y cobro, obligaciones fiscales, posventa y aprendizaje. Un revisor independiente repasa cada plan y añade lo que falte antes de empezar.
+
+## Comercial
+En la fase de captación busca empresas reales a las que la oferta les resuelva un problema, investiga su negocio, encuentra su contacto profesional y redacta un mensaje personalizado. Tú lo apruebas y se abre tu correo con todo escrito. Hace hasta 2 seguimientos y no insiste más. Cuando pegas una respuesta, prepara la contestación y los documentos (presupuesto, contrato, factura) con tus datos. Cumple LSSI y RGPD: nada masivo, remitente identificado y opción de baja.
+
+## Paralelo
+Trabaja en varias tareas a la vez por ciclo (ajustable de 1 a 6): proyectos, seguimientos y respuestas.
+
 ## Generador de apps
 Cuando un proyecto consiste en una app, la programa entera (web app en `www/`), escribe la ficha de Play Store y la política de privacidad, y la sube a un repo privado de tu GitHub. Ese repo incluye un flujo de GitHub Actions que compila el APK (para probar) y el AAB (para Play Store) en cada cambio. A ti te queda en "Firmas" la publicación paso a paso.
 

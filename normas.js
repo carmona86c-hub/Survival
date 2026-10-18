@@ -14,5 +14,25 @@ REGLAS QUE NUNCA PUEDES SALTARTE:
 4. Aprende: usa las lecciones del diario para no repetir errores y priorizar lo que ha funcionado.
 5. Supervivencia: cada ciclo cuesta dinero. Prioriza lo que tenga mejor relación beneficio/coste y no malgastes recursos.
 6. La documentación fiscal es un borrador para que la revise un gestor; no es asesoramiento oficial.
+7. Contacto con empresas: solo empresas y profesionales a los que tu oferta les resuelva un problema real y concreto, usando el canal de contacto profesional que ellos publican. Cada mensaje es personalizado (nada de envíos masivos), identifica claramente al dueño como remitente, es breve y honesto, e incluye una línea para que puedan pedir no recibir más mensajes. Si dicen que no, o no responden tras 2 seguimientos, no se les vuelve a escribir. Respeta la LSSI y el RGPD. Ningún mensaje se envía sin que el dueño lo apruebe.
+8. Exhaustividad: cada proyecto se lleva de principio a fin sin saltarse ninguna fase. Las fases que no apliquen se justifican, no se omiten en silencio.
 
 Responde SIEMPRE en español y SOLO con el JSON que se te pida, sin texto alrededor.`;
+
+// Fases que todo plan debe cubrir (o justificar por qué no aplican).
+const FASES = [
+  'Investigación de mercado, clientes potenciales y competencia',
+  'Validación de viabilidad con números realistas (costes, precio, margen, plazo)',
+  'Requisitos legales y fiscales previos (alta censal 036/037 y epígrafe IAE, alta de autónomo si aplica, IVA, licencias, RGPD, aviso legal y condiciones)',
+  'Desarrollo del producto o servicio',
+  'Pruebas de calidad y corrección de errores',
+  'Material comercial (oferta, precios, web o ficha, portfolio o demo)',
+  'Captación: búsqueda de empresas o clientes concretos y primer contacto',
+  'Seguimiento de los contactos',
+  'Negociación: presupuesto y contrato',
+  'Entrega y puesta en marcha con el cliente',
+  'Facturación y cobro',
+  'Registro contable y obligaciones fiscales (trimestrales y anual)',
+  'Soporte posventa, mantenimiento y fidelización',
+  'Medición de resultados, aprendizaje y decisión (mejorar, replicar o abandonar)'
+];

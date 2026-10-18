@@ -34,6 +34,7 @@ pre{white-space:pre-wrap;word-break:break-word;background:#11141a;padding:10px;b
     <div class="stat"><span class="mut">Gasto en IA</span><b id="sGasto">0 €</b></div>
     <div class="stat"><span class="mut">Proyectos</span><b id="sProy">0</b></div>
     <div class="stat"><span class="mut">Pendiente de firma</span><b id="sFirma">0</b></div>
+    <div class="stat"><span class="mut">Mensajes por aprobar</span><b id="sEnv">0</b></div>
   </div>
   <div class="row" style="margin-top:10px">
     <button id="bCiclo">Ejecutar un ciclo</button>
@@ -46,6 +47,7 @@ pre{white-space:pre-wrap;word-break:break-word;background:#11141a;padding:10px;b
 <div class="tabs" id="tabs">
   <button data-t="op" class="on">Oportunidades</button>
   <button data-t="pr">Proyectos</button>
+  <button data-t="co">Contactos</button>
   <button data-t="fi">Firmas</button>
   <button data-t="hc">Hacienda</button>
   <button data-t="di">Diario</button>
@@ -54,6 +56,7 @@ pre{white-space:pre-wrap;word-break:break-word;background:#11141a;padding:10px;b
 
 <div class="card" id="t-op"><h2>Oportunidades encontradas</h2><div id="lOp" class="mut">Aún no ha buscado nada.</div></div>
 <div class="card hide" id="t-pr"><h2>Proyectos en desarrollo</h2><div id="lPr" class="mut">Ninguno todavía.</div></div>
+<div class="card hide" id="t-co"><h2>Empresas y clientes</h2><div class="mut">Ella busca las empresas, investiga su negocio y redacta cada mensaje. Tú lo lees y pulsas "Aprobar y enviar": se abre tu correo con todo escrito. Hace los seguimientos sola (máximo 2) y, cuando pegas una respuesta, prepara la contestación, el presupuesto, el contrato o la factura.</div><div id="lCo" style="margin-top:8px"></div></div>
 <div class="card hide" id="t-fi"><h2>Pendiente de tu firma</h2><div class="mut">Lo que legalmente exige a una persona real. Ella lo deja preparado.</div><div id="lFi"></div></div>
 <div class="card hide" id="t-hc"><h2>Hacienda</h2>
   <div class="mut">Registro de ingresos y gastos. Genera un borrador de la documentación para que la revise un gestor y tú la firmes.</div>
@@ -75,6 +78,10 @@ pre{white-space:pre-wrap;word-break:break-word;background:#11141a;padding:10px;b
   <label>Precio estimado IA: € por millón de tokens de entrada / salida</label>
   <div class="row"><input id="cPin" type="number" value="3" style="flex:1"><input id="cPout" type="number" value="15" style="flex:1"></div>
   <label>Minutos entre ciclos en modo continuo</label><input id="cMin" type="number" value="10">
+  <label>Tareas a la vez por ciclo (1-6)</label><input id="cPar" type="number" value="3" min="1" max="6">
+  <h2 style="margin-top:18px">Tus datos (para correos, presupuestos, contratos y facturas)</h2>
+  <div class="mut">Se sincronizan entre tus dispositivos de forma privada. Lo que falte aparecerá como [COMPLETAR] en los documentos.</div>
+  <div id="tit"></div>
   <h2 style="margin-top:18px">GitHub: sincronización y apps</h2>
   <div class="mut">Un token clásico de GitHub con permisos <b>gist</b>, <b>repo</b> y <b>workflow</b> (github.com → Settings → Developer settings → Tokens). Sirve para tener el mismo estado en el móvil y el ordenador, y para que suba sola las apps que programe a repos privados, que se compilan para Android automáticamente.</div>
   <label>Token de GitHub (solo en este dispositivo)</label><input id="cGh" type="password" placeholder="ghp_...">
