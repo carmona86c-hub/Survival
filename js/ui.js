@@ -5,24 +5,27 @@ async function ciclo() {
   ocupado = true; $('bCiclo').disabled = true; S.ultimoCiclo = Date.now();
   try {
     const par = Math.max(1, C.par || 3);
-    const tareas = tareasComerciales().slice(0, par);
+    S.ronda = (S.ronda || 0) + 1;
+    // Búsqueda continua: en cada ciclo se reserva un hueco para buscar oportunidades nuevas
+    // (alternando búsqueda general y radar de Play Store). Con 1 sola tarea, busca un ciclo sí y otro no.
+    const explorarAhora = par >= 2 || S.ronda % 2 === 1;
+    const cupo = explorarAhora ? par - 1 : par;
+    const tareas = tareasComerciales().slice(0, cupo);
     const activos = S.proyectos.filter(p => p.estado === 'activo');
-    activos.slice(0, Math.max(0, par - tareas.length)).forEach(p => tareas.push(() => ejecutarPaso(p)));
-    if (activos.length < par && tareas.length < par) {
-      const nuevas = S.oportunidades.filter(o => o.estado === 'nueva').sort((a, b) => b.puntuacion - a.puntuacion);
-      nuevas.filter(o => o.puntuacion <= 0).forEach(o => { o.estado = 'descartada'; log('evaluar', 'Descartada por poco rentable: ' + o.titulo); });
-      const hueco = par - tareas.length;
-      const estudiadas = S.oportunidades.filter(o => o.estado === 'estudiada').sort((a, b) => b.puntuacion - a.puntuacion);
-      const porEstudiar = nuevas.filter(o => o.puntuacion > 0);
-      estudiadas.slice(0, Math.min(hueco, par - activos.length)).forEach(o => tareas.push(() => planificar(o)));
-      porEstudiar.slice(0, Math.max(0, par - tareas.length)).forEach(o => tareas.push(() => estudiar(o)));
-      if (!estudiadas.length && !porEstudiar.length) {
-        // Exploración: general y radar de Play Store, alternando o a la vez si hay hueco.
-        S.ronda = (S.ronda || 0) + 1;
-        if (par - tareas.length >= 2) tareas.push(explorar, explorarApps);
-        else tareas.push(S.ronda % 2 ? explorar : explorarApps);
-      }
+    activos.slice(0, Math.max(0, cupo - tareas.length)).forEach(p => tareas.push(() => ejecutarPaso(p)));
+    // Selección: solo se trabaja en las más rentables.
+    const rentab = (a, b) => (b.puntuacion || 0) - (a.puntuacion || 0);
+    const nuevas = S.oportunidades.filter(o => o.estado === 'nueva').sort(rentab);
+    nuevas.filter(o => o.puntuacion <= 0).forEach(o => { o.estado = 'descartada'; log('evaluar', 'Descartada por poco rentable: ' + o.titulo); });
+    const enCola = nuevas.filter(o => o.puntuacion > 0);
+    enCola.slice(20).forEach(o => { o.estado = 'descartada'; log('evaluar', `Descartada: no está entre las 20 más rentables (${o.titulo})`); });
+    if (activos.length < par) {
+      const estudiadas = S.oportunidades.filter(o => o.estado === 'estudiada').sort(rentab);
+      estudiadas.slice(0, Math.min(cupo - tareas.length, par - activos.length)).forEach(o => tareas.push(() => planificar(o)));
     }
+    enCola.slice(0, 3).slice(0, Math.max(0, cupo - tareas.length)).forEach(o => tareas.push(() => estudiar(o))); // solo el top 3 pasa al I+D
+    if (explorarAhora || !tareas.length) tareas.push(S.ronda % 2 ? explorar : explorarApps);
+    avisoTrimestral(); // en plazo, deja lista en Firmas la presentación del trimestre
     msg(`Trabajando en ${tareas.length} tarea(s) a la vez…`);
     const res = await Promise.allSettled(tareas.map(f => f()));
     res.filter(x => x.status === 'rejected').forEach(x => log('error', x.reason?.message || String(x.reason)));
@@ -45,19 +48,6 @@ async function iniciarAuto() {
 }
 function toggleAuto() { if (timer) pararAuto(); else iniciarAuto(); }
 function pintarEstado() { if ($('sEstado')) $('sEstado').innerHTML = S.viva ? (timer ? '<span class="ok">Trabajando</span>' : 'En pausa') : '<span class="b">Apagada</span>'; }
-
-// ---------- Hacienda ----------
-async function borradorFiscal() {
-  $('hOut').classList.remove('hide'); $('hOut').textContent = 'Preparando…';
-  try {
-    const r = await pensar(`Con estos movimientos del año ${new Date().getFullYear()} (España), prepara un borrador de la documentación fiscal que necesitaría el dueño: qué modelos de Hacienda aplican según el tipo de actividad, cómo se calcularían, qué casillas o apartados y qué documentos debe guardar. Indica qué tiene que firmar y qué debe confirmar con un gestor.
-Movimientos: ${JSON.stringify(S.fiscal)}
-Devuelve JSON: {"resumen","modelos":[{"modelo","para_que","importe_estimado","plazo"}],"documentos":["..."],"a_firmar":["..."],"avisos":["..."]}`, { buscar: true });
-    $('hOut').textContent = JSON.stringify(r, null, 2);
-    log('hacienda', 'Borrador fiscal preparado');
-  } catch (e) { $('hOut').textContent = 'Error: ' + e.message; }
-  save(); pintar();
-}
 
 // ---------- Interfaz ----------
 function pintarID() {
@@ -106,7 +96,10 @@ function pintar() {
   $('sProy').textContent = S.proyectos.filter(p => p.estado === 'activo').length + ' / ' + S.proyectos.length;
   $('sFirma').textContent = S.firmas.filter(f => f.estado === 'pendiente').length;
 
-  $('lOp').innerHTML = S.oportunidades.length ? S.oportunidades.slice().reverse().map(o => `<div class="item"><b>${esc(o.titulo)}</b> <span class="tag">${esc(o.tipo)}</span><span class="tag">${esc(o.estado)}</span><span class="tag">riesgo ${esc(o.riesgo)}</span>
+  const ORD = { en_proyecto: 0, estudiada: 1, en_estudio: 2, nueva: 3, descartada: 9 };
+  const lista = S.oportunidades.slice().sort((a, b) => (ORD[a.estado] ?? 5) - (ORD[b.estado] ?? 5) || (b.puntuacion || 0) - (a.puntuacion || 0));
+  let rk = 0;
+  $('lOp').innerHTML = lista.length ? `<div class="mut" style="margin-bottom:6px">Busca oportunidades nuevas en cada ciclo y las ordena por rentabilidad. Solo las 3 mejores pasan al centro de I+D y solo las mejor valoradas se convierten en proyecto.</div>` + lista.map(o => `<div class="item"${o.estado === 'descartada' ? ' style="opacity:.55"' : ''}><b>${o.estado !== 'descartada' ? `#${++rk} ` : ''}${esc(o.titulo)}</b> <span class="tag">${esc(o.tipo)}</span><span class="tag">${esc(o.estado)}</span><span class="tag">riesgo ${esc(o.riesgo)}</span>
     <div class="mut">${esc(o.descripcion)}</div>${o.clientes ? `<div class="mut">Clientes: ${esc(o.clientes)} · Canal: ${esc(o.canal)}</div>` : ''}${o.evidencia_demanda ? `<div class="mut">Demanda: ${esc(o.evidencia_demanda)}</div>` : ''}${(o.fuentes || []).length ? `<div class="mut">Fuentes: ${o.fuentes.filter(f => /^https?:/.test(f)).map((f, i) => `<a href="${esc(f)}" target="_blank" style="color:inherit">[${i + 1}]</a>`).join(' ')}</div>` : '<div class="mut w">Sin fuentes</div>'}<div class="mut">Inversión ${eur(o.inversion_eur || 0)} · Ingreso/mes ${eur(o.ingreso_mensual_eur || 0)} · Prob. ${Math.round((o.probabilidad || 0) * 100)}% · Puntuación ${o.puntuacion}</div></div>`).join('') : 'Aún no ha buscado nada.';
 
   $('lPr').innerHTML = S.proyectos.length ? S.proyectos.slice().reverse().map(p => `<div class="item"><b>${esc(p.titulo)}</b> <span class="tag">${esc(p.estado)}${p.valoracion ? ' · ' + esc(p.valoracion) : ''}</span>
@@ -144,8 +137,7 @@ function pintar() {
     <div class="hide" id="r-${c.id}"><textarea rows="4" placeholder="Pega aquí su respuesta"></textarea><button data-c="${c.id}" data-a="guardar" style="margin-top:6px">Guardar y que prepare el siguiente paso</button></div></div>`;
   }).join('') : 'Aún no ha contactado con nadie. Lo hará cuando un proyecto llegue a la fase de captación.';
 
-  const ing = S.fiscal.filter(m => m.tipo === 'ingreso').reduce((a, m) => a + m.imp, 0), gas = S.fiscal.filter(m => m.tipo === 'gasto').reduce((a, m) => a + m.imp, 0);
-  $('lHc').innerHTML = `<div class="mut">Ingresos ${eur(ing)} · Gastos ${eur(gas)} · Beneficio ${eur(ing - gas)}</div>` + S.fiscal.slice().reverse().map(m => `<div class="item">${m.fecha} · ${m.tipo === 'ingreso' ? '<span class="ok">+' : '<span class="b">-'}${eur(m.imp)}</span> · ${esc(m.con)}</div>`).join('');
+  pintarHacienda();
 
   $('lDi').innerHTML = (S.lecciones.length ? '<b>Lecciones</b>' + S.lecciones.map(l => `<div class="item">💡 ${esc(l)}</div>`).join('') + '<br>' : '') +
     (S.diario.map(d => `<div class="item"><span class="tag">${esc(d.tipo)}</span>${new Date(d.t).toLocaleString('es-ES')} — ${esc(d.txt)}</div>`).join('') || 'Vacío.');
@@ -167,7 +159,9 @@ $('lFi').onclick = e => {
     reescribir({ asunto: f.titulo, cuerpo: f.documento }, ins, pr ? contextoPr(pr) : f.donde).then(v => { f.documento = v.cuerpo; log('firma', `Rehecho «${f.titulo}»: ${ins}`); msg('Documento rehecho'); save(); pintar(); }).catch(err => { msg('Error: ' + err.message); e.target.disabled = false; });
     return;
   }
-  f.estado = a; log('firma', f.titulo + ': ' + f.estado); save(); pintar();
+  f.estado = a; log('firma', f.titulo + ': ' + f.estado);
+  if (a === 'firmado') registrarFactura(f); // la venta pasa sola al libro de Hacienda
+  save(); pintar();
 };
 async function accionApp(d, boton, entrada) {
   const id = d.zip || d.up || d.ver || d.aprobar || d.mejorar; const p = S.proyectos.find(x => x.id === id); if (!p) return;
@@ -218,7 +212,13 @@ $('lCo').onclick = e => {
   save(); pintar();
 };
 $('bCiclo').onclick = ciclo; $('bAuto').onclick = toggleAuto;
-$('hAdd').onclick = () => { const imp = parseFloat($('hImp').value); if (!imp) return; S.fiscal.push({ tipo: $('hTipo').value, imp, con: $('hCon').value, fecha: new Date().toLocaleDateString('es-ES') }); $('hImp').value = $('hCon').value = ''; save(); pintar(); };
+$('hAdd').onclick = () => {
+  const imp = parseFloat($('hImp').value); if (!imp) return;
+  S.fiscal.push({ tipo: $('hTipo').value, imp: r2(imp), iva: +$('hIva').value || 0, ret: $('hTipo').value === 'ingreso' ? (+$('hRet').value || 0) : 0, con: $('hCon').value.trim(), cliente: $('hQuien').value.trim(), num: $('hNum').value.trim(), fecha: new Date().toISOString() });
+  ['hImp', 'hCon', 'hQuien', 'hNum'].forEach(k => $(k).value = ''); save(); pintar();
+};
+$('lHc').onclick = e => { const i = e.target.dataset.hdel; if (i == null) return; if (confirm('¿Quitar este movimiento?')) { S.fiscal.splice(+i, 1); save(); pintar(); } };
+$('hPrint').onclick = () => imprimirHacienda(+$('hAnio').value || new Date().getFullYear(), $('hTri').value);
 $('hDoc').onclick = borradorFiscal;
 ['key', 'model', 'cap', 'pin', 'pout', 'min', 'gh', 'gist', 'par'].forEach(k => $('c' + k[0].toUpperCase() + k.slice(1)).value = C[k]);
 $('tit').innerHTML = Object.entries(CAMPOS_TIT).map(([k, l]) => `<label>${l}</label><input data-tit="${k}">`).join('');
