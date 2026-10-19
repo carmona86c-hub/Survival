@@ -35,6 +35,11 @@ jobs:
 `;
 }
 
+// La app corre aislada (sin acceso a los datos de Survival). Para que no se rompa al guardar datos,
+// se le da un almacenamiento propio en memoria y avisa al visor de que ha arrancado o de sus errores.
+const SHIM = id => `<script>(()=>{try{localStorage.getItem('_')}catch(e){const m=()=>{const d={};return{getItem:k=>k in d?d[k]:null,setItem:(k,v)=>{d[k]=String(v)},removeItem:k=>{delete d[k]},clear:()=>{for(const k in d)delete d[k]},key:i=>Object.keys(d)[i]??null,get length(){return Object.keys(d).length}}};for(const n of['localStorage','sessionStorage'])try{Object.defineProperty(window,n,{value:m(),configurable:true})}catch(x){}}${id ? `const P=x=>parent.postMessage(Object.assign({visor:'${id}'},x),'*');addEventListener('error',e=>P({err:e.message+' (línea '+e.lineno+')'}));addEventListener('unhandledrejection',e=>P({err:'Promesa: '+(e.reason&&e.reason.message||e.reason)}));addEventListener('load',()=>P({ok:1}));` : ''}})()<\/script>`;
+const inyectar = (html, extra) => /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, m => m + extra) : extra + html;
+
 // Ejecuta la app en un iframe aislado (tamaño móvil) y recoge errores reales y problemas de pantalla.
 function probarApp(html) {
   return new Promise(ok => {
@@ -45,7 +50,7 @@ function probarApp(html) {
     let res = null;
     const on = e => { if (e.data?.sv !== id) return; if (e.data.e) errores.push(e.data.e); if (e.data.fin) res = e.data; };
     addEventListener('message', on);
-    f.srcdoc = /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, m => m + espia) : espia + html;
+    f.srcdoc = inyectar(html, SHIM() + espia);
     document.body.appendChild(f);
     setTimeout(() => { removeEventListener('message', on); f.remove(); ok({ errores, cargo: !!res, texto: res?.texto || 0, botones: res?.botones || 0 }); }, 4500);
   });
@@ -192,14 +197,26 @@ async function zipApp(pr) {
 }
 
 // ---------- Visor: la app dentro de un marco de móvil, aislada ----------
+let visorEscucha = () => {}, visorTimer;
 function verApp(pr) {
   const idx = htmlApp(pr); if (!idx) return msg('Esta app aún no tiene pantalla');
   $('visorTit').textContent = `${pr.app.nombre} · v${pr.app.version || 1}`;
   const n = pr.app.pruebas?.at(-1)?.notas;
-  $('visorNotas').textContent = n ? `Notas de calidad: visual ${n.visual} · uso ${n.usabilidad} · detalle ${n.detalle} · práctica ${n.practica}` : '';
-  $('visorFrame').srcdoc = idx.contenido;
+  const notas = n ? `Notas de calidad: visual ${n.visual} · uso ${n.usabilidad} · detalle ${n.detalle} · práctica ${n.practica}` : '';
+  $('visorNotas').textContent = notas; $('visorNotas').className = 'mut';
+  const id = uid(); let arranco = false; const errs = [];
+  removeEventListener('message', visorEscucha);
+  visorEscucha = e => {
+    if (e.data?.visor !== id) return;
+    if (e.data.ok) arranco = true;
+    if (e.data.err) { errs.push(e.data.err); $('visorNotas').className = 'b'; $('visorNotas').textContent = '⚠ La app tiene un error: ' + errs[0] + ' — pulsa «Rehacer app» y lo corrige.'; $('visorPedir').value = 'Corrige este error: ' + errs[0]; }
+  };
+  addEventListener('message', visorEscucha);
+  clearTimeout(visorTimer);
+  visorTimer = setTimeout(() => { if (!arranco && !errs.length) { $('visorNotas').className = 'w'; $('visorNotas').textContent = '⚠ La app no ha llegado a arrancar en este visor. Si estás en la vista previa de Claude, ábrela desde carmona86c-hub.github.io/Survival; si no, pulsa «Rehacer app».'; } }, 4000);
+  $('visorFrame').srcdoc = inyectar(idx.contenido, SHIM(id));
   $('visor').dataset.pr = pr.id;
   $('visor').classList.remove('hide', 'completa');
   document.body.style.overflow = 'hidden';
 }
-function cerrarVisor() { $('visor').classList.add('hide'); $('visorFrame').srcdoc = ''; document.body.style.overflow = ''; }
+function cerrarVisor() { clearTimeout(visorTimer); removeEventListener('message', visorEscucha); $('visor').classList.add('hide'); $('visorFrame').srcdoc = ''; document.body.style.overflow = ''; }
