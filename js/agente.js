@@ -2,7 +2,7 @@
 async function explorar() {
   msg('Buscando oportunidades…');
   const ya = S.oportunidades.map(o => o.titulo).join('; ') || 'ninguna';
-  const r = await pensar(`Investiga en internet oportunidades ACTUALES y legales para generar ingresos, en cualquier ámbito y para cualquier tipo de cliente: empresas, autónomos, particulares, administraciones (licitaciones, subvenciones), plataformas y marketplaces, contenido, productos digitales, inversión… Ya conocidas (no repetir): ${ya}.
+  const r = await pensar(`Investiga en internet oportunidades ACTUALES y legales para generar ingresos, en cualquier ámbito y para cualquier tipo de cliente: empresas, autónomos, particulares, administraciones (licitaciones, subvenciones), plataformas y marketplaces, contenido, productos digitales, servicios… (nunca bolsa, trading, cripto ni inversión financiera) Ya conocidas (no repetir): ${ya}.
 Solo oportunidades con demanda REAL comprobada (fuentes concretas) y que puedas entregar con tus CAPACIDADES REALES más lo que el dueño pueda hacer. No infles cifras: si no hay datos, estima a la baja y dilo.
 Devuelve un array JSON de 3 oportunidades: [{"titulo","tipo","clientes":"a quién se vende","canal":"cómo se llega a ellos","descripcion","inversion_eur":número,"ingreso_mensual_eur":número,"plazo_dias":número,"riesgo":"bajo|medio|alto","probabilidad":0-1,"evidencia_demanda":"qué demuestra que hay demanda","puedes_entregarlo":true|false,"necesita_del_dueno":["..."],"requiere_firma":["..."],"fuentes":["url"]}]`, { buscar: true, max: 6000 });
   return registrarOportunidades(r, 'general');
@@ -22,6 +22,7 @@ function registrarOportunidades(r, origen) {
   let n = 0;
   (Array.isArray(r) ? r : []).forEach(o => {
     if (o.puedes_entregarlo === false) { log('evaluar', 'Descartada (no se puede entregar de verdad): ' + o.titulo); return; }
+    if (/bolsa de valores|burs[aá]til|trading|cripto|bitcoin|forex|divisas|inversi[oó]n financiera|especulaci|(compra|venta|invertir en) acciones/i.test((o.titulo || '') + ' ' + (o.tipo || '') + ' ' + (o.descripcion || ''))) { log('evaluar', 'Descartada (inversión financiera, fuera del alcance): ' + o.titulo); return; }
     if (!o.titulo || S.oportunidades.some(x => x.titulo.toLowerCase() === o.titulo.toLowerCase())) return;
     o.id = uid(); o.estado = 'nueva'; o.origen = origen;
     const fiable = (o.fuentes || []).filter(f => /^https?:\/\//.test(f)).length ? 1 : 0.5;
