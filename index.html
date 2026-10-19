@@ -20,7 +20,14 @@ label{display:block;font-size:13px;color:var(--mut);margin:8px 0 3px}
 .tag{display:inline-block;font-size:11px;padding:2px 7px;border-radius:99px;background:#2a2f3a;margin-right:4px}
 .ok{color:var(--ac)}.w{color:var(--warn)}.b{color:var(--bad)}
 pre{white-space:pre-wrap;word-break:break-word;background:#11141a;padding:10px;border-radius:8px;font-size:12px;max-height:340px;overflow:auto}
-.hide{display:none}
+.hide{display:none!important}
+.appcard{background:#11141a;border:1px solid var(--ln);border-radius:12px;padding:12px;margin:8px 0}
+.notas{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}.nota{background:#1d212a;border-radius:9px;padding:6px 10px;font-size:11px;color:var(--mut);text-align:center;min-width:62px}.nota b{display:block;font-size:18px}.nota.ok b{color:var(--ac)}.nota.w b{color:var(--warn)}
+.visor{position:fixed;inset:0;z-index:50;background:#0b0d11;display:flex;flex-direction:column;align-items:center;gap:10px;padding:max(12px,env(safe-area-inset-top)) 12px max(12px,env(safe-area-inset-bottom))}
+.visor .barra{width:min(900px,100%);display:flex;gap:8px;align-items:center;flex-wrap:wrap}.visor .barra b{flex:1;min-width:140px}
+.movil{flex:1;min-height:0;aspect-ratio:390/844;max-width:100%;border:10px solid #2a2f3a;border-radius:38px;overflow:hidden;background:#000;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.movil iframe{width:100%;height:100%;border:0;background:#fff;display:block}
+.visor.completa{padding:0;gap:0}.visor.completa .movil{border:0;border-radius:0;aspect-ratio:auto;width:100%}.visor.completa .barra:last-child{display:none}
 </style>
 </head>
 <body>
@@ -85,11 +92,17 @@ pre{white-space:pre-wrap;word-break:break-word;background:#11141a;padding:10px;b
   <div class="mut">Se sincronizan entre tus dispositivos de forma privada. Lo que falte aparecerá como [COMPLETAR] en los documentos.</div>
   <div id="tit"></div>
   <h2 style="margin-top:18px">GitHub: sincronización y apps</h2>
-  <div class="mut">Un token clásico de GitHub con permisos <b>gist</b>, <b>repo</b> y <b>workflow</b> (github.com → Settings → Developer settings → Tokens). Sirve para tener el mismo estado en el móvil y el ordenador, y para que suba sola las apps que programe a repos privados, que se compilan para Android automáticamente.</div>
+  <div class="mut">Un token clásico de GitHub con permisos <b>gist</b>, <b>repo</b> y <b>workflow</b> (github.com → Settings → Developer settings → Tokens). Sirve para tener el mismo estado en el móvil y el ordenador, y para subir a repos privados las apps que tú apruebes, que se compilan para Android automáticamente.</div>
   <label>Token de GitHub (solo en este dispositivo)</label><input id="cGh" type="password" placeholder="ghp_...">
   <label>ID de sincronización (vacío en el primer dispositivo; en el segundo, pega el del primero)</label><input id="cGist" placeholder="se genera solo">
   <div class="row" style="margin-top:8px"><button id="cSync" class="sec">Conectar sincronización</button><span class="mut" id="sSync"></span></div>
   <div class="row" style="margin-top:14px"><button id="cSave">Guardar</button><button id="cReset" class="bad">Reiniciar todo</button><button id="cExp" class="sec">Exportar datos</button></div>
+</div>
+
+<div class="visor hide" id="visor" role="dialog" aria-label="Vista previa de la app">
+  <div class="barra"><b id="visorTit">App</b><button class="sec" id="visorCompleta">Pantalla completa</button><button class="sec" id="visorCerrar">Cerrar ✕</button></div>
+  <div class="movil"><iframe id="visorFrame" title="Vista previa de la app" sandbox="allow-scripts allow-forms"></iframe></div>
+  <div class="barra"><span class="mut" id="visorNotas" style="width:100%"></span><input id="visorPedir" placeholder="¿Qué cambiarías? «otro color», «botón más grande»…" style="flex:1;min-width:160px"><button class="sec" id="visorRehacer">Rehacer app</button><button id="visorAprobar">✔ Aprobar</button></div>
 </div>
 
 <script src="normas.js"></script>

@@ -10,7 +10,7 @@ IA autónoma que busca **cualquier forma legal** de ganar dinero y la ejecuta de
 5. **Solo pide firma** en lo que legalmente exige a una persona real (identidad, cuentas, cobros, contratos, impuestos).
 6. **Supervivencia**: cada ciclo cuesta dinero; si se queda sin capital, se apaga.
 
-Las normas fijas están en `normas.js`. El código está en `js/`: `nucleo.js` (estado, sincronización y cerebro), `agente.js` (búsqueda, I+D, planes y ejecución), `apps.js` (fábrica de apps), `comercial.js` (clientes, verificador y supervisión) y `ui.js` (ciclo e interfaz).
+Las normas fijas están en `normas.js`. El código está en `js/`: `nucleo.js` (estado, sincronización y cerebro), `agente.js` (búsqueda, I+D, planes y ejecución), `apps.js` (fábrica de apps y visor), `comercial.js` (clientes, verificador y supervisión) y `ui.js` (ciclo e interfaz).
 
 ## Estado actual: modo pruebas
 Piensa, investiga en internet y desarrolla entregables, pero **no ejecuta nada real** (ni pagos, ni registros, ni publicaciones). El capital es simulado.
@@ -25,7 +25,13 @@ Cada oportunidad, antes de empezar, la estudia un grupo de especialistas en para
 Busca qué apps se piden o hacen falta: categorías de Google Play, quejas repetidas en reseñas, peticiones en foros y Reddit, colectivos con necesidades sin cubrir y apps malas, caras o abandonadas. Alterna con la búsqueda general, o lo hace a la vez si hay hueco.
 
 ## Fábrica de apps
-Programa la app siguiendo la especificación del estudio. Después la **ejecuta de verdad** en un entorno aislado, pulsa sus botones y recoge los errores. Un equipo de calidad la revisa frente a la especificación y se corrige automáticamente, en hasta 3 rondas. El resultado de cada ronda queda en el proyecto. Escribe también la ficha de Play Store y la política de privacidad, y la sube a un repo privado de tu GitHub con un flujo que compila el APK (para probar) y el AAB (para Play Store). A ti te queda en "Firmas" la publicación paso a paso.
+1. **Director de diseño**: estudia las apps mejor valoradas de la categoría y sus críticas, y define la identidad (paleta clara y oscura, tipografía, iconos), cada pantalla con sus elementos, interacciones y estado vacío, el flujo principal y los detalles que la harán memorable.
+2. **Programación** siguiendo ese diseño y el **estándar de calidad** (`ESTANDAR_APP` en `js/apps.js`): visual cuidada, todo completo, deshacer y avisos, búsqueda, exportar e importar, onboarding, modo oscuro, zonas táctiles grandes, sin errores, accesible y sin conexión.
+3. **Pruebas reales** en un móvil de 390 px (errores, desbordes, botones pequeños) y **revisión de diseño con nota** (visual, uso, detalle y práctica). Si alguna nota baja de 8, se mejora sola, en hasta 3 rondas.
+4. **Tú la ves antes de subirla**: en Proyectos, «👁 Ver app» la abre en un marco de móvil, funcionando. Puedes usarla, ponerla a pantalla completa, pedirle cambios con tus palabras (la rehace y la vuelve a probar) o aprobarla.
+5. **Solo tras tu aprobación** se sube a un repo privado de tu GitHub, que compila el APK (para probar) y el AAB (para Play Store), y en «Firmas» te queda la publicación paso a paso.
+
+En `ejemplos/turnos-facil.html` hay una app de muestra hecha con este estándar.
 
 ## Supervisión
 Ella redacta todos los escritos: mensajes a empresas, respuestas a clientes, presupuestos, contratos y anuncios. Tú los ves antes de que salga nada: puedes editarlos a mano o pedirle cambios con tus palabras ("más corto", "añade pago a 30 días") y los rehace, pasando de nuevo por el verificador. Nada sale sin tu conformidad.
