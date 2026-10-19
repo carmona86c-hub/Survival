@@ -68,16 +68,20 @@ pre{white-space:pre-wrap;word-break:break-word;background:#11141a;padding:10px;b
 <div class="card hide" id="t-co"><h2>Empresas y clientes</h2><div class="mut">Ella busca las empresas, investiga su negocio y redacta cada mensaje. Tú lo lees y pulsas "Aprobar y enviar": se abre tu correo con todo escrito. Hace los seguimientos sola (máximo 2) y, cuando pegas una respuesta, prepara la contestación, el presupuesto, el contrato o la factura.</div><div id="lCo" style="margin-top:8px"></div></div>
 <div class="card hide" id="t-fi"><h2>Pendiente de tu firma</h2><div class="mut">Lo que legalmente exige a una persona real. Ella lo deja preparado.</div><div id="lFi"></div></div>
 <div class="card hide" id="t-hc"><h2>Hacienda</h2>
-  <div class="mut">Registro de ingresos y gastos. Genera un borrador de la documentación para que la revise un gestor y tú la firmes.</div>
-  <div class="row" style="margin-top:8px">
-    <select id="hTipo" style="width:auto"><option value="ingreso">Ingreso</option><option value="gasto">Gasto</option></select>
-    <input id="hImp" type="number" placeholder="Importe €" style="width:120px">
-    <input id="hCon" placeholder="Concepto" style="flex:1;min-width:140px">
-    <button id="hAdd" class="sec">Añadir</button>
-  </div>
+  <div class="mut">Se rellena sola: cada factura que apruebas en Firmas se apunta como venta, con su IVA y su retención, y aquí se calculan los modelos 303 (IVA) y 130 (IRPF) de cada trimestre. Tú solo añades los gastos con factura y le das a imprimir.</div>
   <div id="lHc" style="margin-top:8px"></div>
-  <div class="row" style="margin-top:8px"><button id="hDoc">Preparar borrador fiscal</button></div>
+  <h2 style="margin-top:14px">Imprimir documentación</h2>
+  <div class="row"><input id="hAnio" type="number" style="width:100px"><select id="hTri" style="width:auto"></select><button id="hPrint">🖨 Preparar para imprimir</button><button id="hDoc" class="sec">Revisión del asesor IA</button></div>
+  <div class="mut" style="margin-top:4px">Incluye tus datos, los modelos con sus cifras, el libro de facturas emitidas, el de gastos y el plazo. La revisión del asesor añade qué modelos te tocan según tu situación y avisos.</div>
   <pre id="hOut" class="hide"></pre>
+  <details style="margin-top:10px"><summary>Añadir un gasto o una venta a mano</summary>
+  <div class="row" style="margin-top:8px">
+    <select id="hTipo" style="width:auto"><option value="gasto">Gasto</option><option value="ingreso">Venta</option></select>
+    <input id="hImp" type="number" placeholder="Base sin IVA €" style="width:130px">
+    <select id="hIva" style="width:auto"><option value="21">IVA 21 %</option><option value="10">IVA 10 %</option><option value="4">IVA 4 %</option><option value="0">Sin IVA</option></select>
+    <select id="hRet" style="width:auto"><option value="0">Sin retención</option><option value="15">Retención 15 %</option><option value="7">Retención 7 %</option></select>
+  </div>
+  <div class="row" style="margin-top:6px"><input id="hQuien" placeholder="Cliente o proveedor" style="flex:1;min-width:130px"><input id="hNum" placeholder="N.º factura" style="width:120px"><input id="hCon" placeholder="Concepto" style="flex:1;min-width:130px"><button id="hAdd" class="sec">Añadir</button></div></details>
 </div>
 <div class="card hide" id="t-di"><h2>Diario y lecciones aprendidas</h2><div id="lDi" class="mut">Vacío.</div></div>
 <div class="card hide" id="t-cf"><h2>Ajustes</h2>
@@ -111,6 +115,7 @@ pre{white-space:pre-wrap;word-break:break-word;background:#11141a;padding:10px;b
 <script src="js/apps.js"></script>
 <script src="js/agente.js"></script>
 <script src="js/comercial.js"></script>
+<script src="js/hacienda.js"></script>
 <script src="js/ui.js"></script>
 </body>
 </html>
