@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Turnos Fácil</title>
+<style>
+:root{--bg:#f6f3ee;--sup:#fffdf9;--tx:#1d1a16;--mut:#7a7166;--ln:#e7e0d6;--ac:#e2552d;--ac2:#2f7d6d;--ok:#2f7d6d;--sh:0 1px 2px rgba(60,40,20,.06),0 8px 24px rgba(60,40,20,.08);
+--f:ui-rounded,"SF Pro Rounded","Segoe UI Variable Display","Nunito",system-ui,sans-serif;--n:ui-monospace,"SF Mono","Cascadia Mono",monospace}
+@media (prefers-color-scheme:dark){:root{--bg:#14120f;--sup:#1e1b17;--tx:#f3eee7;--mut:#a39a8e;--ln:#2e2a24;--ac:#ff7a52;--ac2:#5cc4ad;--ok:#5cc4ad;--sh:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35);color-scheme:dark}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--tx);font:16px/1.4 var(--f)}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+:focus-visible{outline:3px solid var(--ac);outline-offset:2px;border-radius:10px}
+.app{height:100%;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top)}
+header{padding:18px 18px 10px;display:flex;align-items:center;gap:12px}
+header h1{font-size:24px;margin:0;letter-spacing:-.02em;flex:1}
+.semana{display:flex;align-items:center;gap:4px;font-size:13px;color:var(--mut)}
+.semana button{width:44px;height:44px;border-radius:14px;display:grid;place-items:center}
+.semana button:active{background:var(--ln)}
+main{flex:1;overflow-y:auto;padding:0 14px 110px}
+.dias{display:flex;gap:6px;overflow-x:auto;padding:4px 2px 12px;scrollbar-width:none}
+.dia{flex:0 0 auto;width:52px;height:68px;border-radius:18px;background:var(--sup);box-shadow:var(--sh);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;transition:transform .2s,background .2s}
+.dia small{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.06em}
+.dia b{font-size:20px;font-family:var(--n)}
+.dia i{width:6px;height:6px;border-radius:50%;background:var(--ln)}.dia i.si{background:var(--ac)}
+.dia.on{background:var(--ac);color:#fff;transform:translateY(-2px)}.dia.on small{color:#fff9}.dia.on i{background:#fff}
+.resumen{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:4px 0 16px}
+.kpi{background:var(--sup);border-radius:16px;padding:12px;box-shadow:var(--sh)}
+.kpi b{display:block;font:600 22px var(--n)}.kpi span{font-size:12px;color:var(--mut)}
+h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin:18px 4px 8px}
+.turno{display:flex;align-items:center;gap:12px;background:var(--sup);border-radius:18px;padding:12px 14px;margin-bottom:8px;box-shadow:var(--sh);animation:entra .35s both}
+@keyframes entra{from{opacity:0;transform:translateY(8px)}}
+.av{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;font-weight:700;color:#fff;flex:0 0 auto}
+.turno .q{flex:1;min-width:0}.turno .q b{display:block}.turno .q span{font:13px var(--n);color:var(--mut)}
+.franja{font-size:12px;padding:4px 9px;border-radius:99px;background:var(--bg);color:var(--mut)}
+.del{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;color:var(--mut)}
+.vacio{text-align:center;padding:30px 20px;color:var(--mut)}
+.vacio svg{width:120px;height:120px;margin-bottom:8px}
+.vacio button{margin-top:10px;background:var(--ac);color:#fff;padding:12px 20px;border-radius:14px;font-weight:600}
+.persona{display:flex;align-items:center;gap:12px;padding:10px 4px;border-bottom:1px solid var(--ln)}
+.persona .q{flex:1}.persona .q span{font-size:13px;color:var(--mut)}
+.barra{height:6px;border-radius:9px;background:var(--ln);margin-top:6px;overflow:hidden}.barra i{display:block;height:100%;background:var(--ac2);border-radius:9px;transition:width .5s}
+nav{position:fixed;left:0;right:0;bottom:0;padding:8px 14px calc(10px + env(safe-area-inset-bottom));background:linear-gradient(transparent,var(--bg) 30%);display:flex;justify-content:center}
+nav .in{display:flex;gap:4px;background:var(--sup);border-radius:22px;padding:6px;box-shadow:var(--sh)}
+nav button{min-width:64px;height:52px;border-radius:16px;font-size:11px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:var(--mut)}
+nav button.on{color:var(--ac);background:var(--bg)}
+nav button svg{width:22px;height:22px}
+.fab{position:fixed;right:18px;bottom:calc(86px + env(safe-area-inset-bottom));width:60px;height:60px;border-radius:20px;background:var(--ac);color:#fff;display:grid;place-items:center;box-shadow:0 10px 30px color-mix(in srgb,var(--ac) 45%,transparent);transition:transform .15s}
+.fab:active{transform:scale(.92)}
+.capa{position:fixed;inset:0;background:#0007;display:flex;align-items:flex-end;opacity:0;pointer-events:none;transition:opacity .2s;z-index:5}
+.capa.on{opacity:1;pointer-events:auto}
+.hoja{width:100%;background:var(--sup);border-radius:26px 26px 0 0;padding:10px 18px calc(18px + env(safe-area-inset-bottom));transform:translateY(100%);transition:transform .28s cubic-bezier(.2,.9,.3,1)}
+.capa.on .hoja{transform:none}
+.asa{width:40px;height:5px;border-radius:9px;background:var(--ln);margin:0 auto 12px}
+.hoja h3{margin:0 0 12px;font-size:20px}
+label{display:block;font-size:13px;color:var(--mut);margin:12px 0 6px}
+input,select{width:100%;height:48px;border-radius:14px;border:1px solid var(--ln);background:var(--bg);color:var(--tx);padding:0 14px;font:inherit}
+.chips{display:flex;gap:6px;flex-wrap:wrap}.chip{padding:10px 14px;border-radius:12px;background:var(--bg);border:1px solid var(--ln);min-height:44px}.chip.on{background:var(--ac);border-color:var(--ac);color:#fff}
+.dos{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.prim{width:100%;height:52px;border-radius:16px;background:var(--ac);color:#fff;font-weight:700;margin-top:16px}
+.err{color:var(--ac);font-size:13px;min-height:18px;margin-top:6px}
+.toast{position:fixed;left:50%;bottom:calc(150px + env(safe-area-inset-bottom));transform:translate(-50%,20px);background:var(--tx);color:var(--bg);padding:12px 16px;border-radius:14px;display:flex;gap:14px;align-items:center;opacity:0;transition:.25s;z-index:9;max-width:90%}
+.toast.on{opacity:1;transform:translate(-50%,0)}.toast button{color:var(--ac);font-weight:700;min-height:36px}
+.fila{display:flex;gap:8px;margin-top:10px}.fila button{flex:1;height:48px;border-radius:14px;background:var(--sup);box-shadow:var(--sh)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header><h1 id="titulo">Turnos</h1>
+    <div class="semana" id="semNav"><button aria-label="Semana anterior" data-s="-1"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg></button><span id="semTxt"></span><button aria-label="Semana siguiente" data-s="1"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M9 5l7 7-7 7"/></svg></button></div>
+  </header>
+  <main id="vista"></main>
+</div>
+<button class="fab" id="fab" aria-label="Añadir turno"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+<nav><div class="in">
+  <button class="on" data-v="semana"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="4"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>Semana</button>
+  <button data-v="equipo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><circle cx="17" cy="9" r="2.5"/><path d="M16.5 14.5c2.6.3 4.4 2 5 5"/></svg>Equipo</button>
+  <button data-v="ajustes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Ajustes</button>
+</div></nav>
+<div class="capa" id="capa"><div class="hoja" role="dialog" aria-modal="true" aria-labelledby="hojaTit"><div class="asa"></div><div id="hoja"></div></div></div>
+<div class="toast" id="toast" role="status"><span id="toastTxt"></span><button id="toastBtn">Deshacer</button></div>
+<script>
+const COL=['#e2552d','#2f7d6d','#7a5ae0','#d49a1e','#2b7bd6','#c2417a'];
+const DIAS=['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+const FRANJAS={Mañana:['08:00','16:00'],Tarde:['16:00','00:00'],Partido:['12:00','20:00']};
+const K='turnos-facil-v1';
+let D=cargar()||ejemplo(),vista='semana',sem=0,dia=(new Date().getDay()+6)%7,deshacer=null,tt;
+function cargar(){try{return JSON.parse(localStorage.getItem(K))}catch(e){return null}}
+function guardar(){try{localStorage.setItem(K,JSON.stringify(D))}catch(e){}}
+function ejemplo(){return{ejemplo:true,local:'Bar La Plaza (ejemplo)',equipo:[{id:'a',n:'Lucía',c:0,h:40},{id:'b',n:'Marcos',c:1,h:30},{id:'c',n:'Ana',c:2,h:20}],turnos:[{id:'t1',p:'a',s:0,d:0,f:'Mañana'},{id:'t2',p:'b',s:0,d:0,f:'Tarde'},{id:'t3',p:'c',s:0,d:1,f:'Partido'},{id:'t4',p:'a',s:0,d:2,f:'Mañana'},{id:'t5',p:'b',s:0,d:4,f:'Tarde'},{id:'t6',p:'c',s:0,d:5,f:'Mañana'},{id:'t7',p:'a',s:0,d:5,f:'Tarde'}]}}
+const $=s=>document.querySelector(s),uid=()=>Math.random().toString(36).slice(2,8),esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const horas=f=>{const[a,b]=FRANJAS[f];let h=+b.slice(0,2)-+a.slice(0,2);return h<=0?h+24:h};
+const per=id=>D.equipo.find(x=>x.id===id);
+function lunes(o){const d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()-((d.getDay()+6)%7)+o*7);return d}
+function toast(t,fn){$('#toastTxt').textContent=t;$('#toastBtn').hidden=!fn;deshacer=fn;$('#toast').classList.add('on');clearTimeout(tt);tt=setTimeout(()=>$('#toast').classList.remove('on'),3500)}
+$('#toastBtn').onclick=()=>{deshacer&&deshacer();$('#toast').classList.remove('on')};
+function pintar(){
+  const l=lunes(sem);$('#semTxt').textContent=l.toLocaleDateString('es-ES',{day:'numeric',month:'short'});
+  $('#semNav').hidden=vista!=='semana';$('#fab').hidden=vista==='ajustes';
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===vista));
+  $('#titulo').textContent={semana:'Turnos',equipo:'Equipo',ajustes:'Ajustes'}[vista];
+  const T=D.turnos.filter(t=>t.s===sem);
+  if(vista==='semana'){
+    const hoy=T.filter(t=>t.d===dia),tot=T.reduce((a,t)=>a+horas(t.f),0);
+    $('#vista').innerHTML=`<div class="dias">${DIAS.map((n,i)=>{const f=new Date(l);f.setDate(f.getDate()+i);return`<button class="dia ${i===dia?'on':''}" data-d="${i}" aria-label="${n} ${f.getDate()}"><small>${n}</small><b>${f.getDate()}</b><i class="${T.some(t=>t.d===i)?'si':''}"></i></button>`}).join('')}</div>
+    <div class="resumen"><div class="kpi"><b>${T.length}</b><span>turnos</span></div><div class="kpi"><b>${tot}h</b><span>semana</span></div><div class="kpi"><b>${new Set(T.map(t=>t.p)).size}/${D.equipo.length}</b><span>personas</span></div></div>
+    ${D.ejemplo?'<div class="kpi" style="margin-bottom:8px;font-size:13px">👋 Estos son datos de ejemplo. Bórralos en Ajustes cuando quieras empezar.</div>':''}
+    <h2>${DIAS[dia]} · ${hoy.length} turno${hoy.length===1?'':'s'}</h2>
+    ${hoy.length?hoy.sort((a,b)=>FRANJAS[a.f][0]<FRANJAS[b.f][0]?-1:1).map(t=>{const p=per(t.p)||{n:'?',c:0};return`<div class="turno"><div class="av" style="background:${COL[p.c]}">${esc(p.n[0])}</div><div class="q"><b>${esc(p.n)}</b><span>${FRANJAS[t.f].join(' – ')} · ${horas(t.f)}h</span></div><span class="franja">${t.f}</span><button class="del" data-x="${t.id}" aria-label="Quitar turno de ${esc(p.n)}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>`}).join(''):vacio('Nadie trabaja este día','Añadir turno','nuevo')}`;
+  }else if(vista==='equipo'){
+    $('#vista').innerHTML=D.equipo.length?D.equipo.map(p=>{const h=T.filter(t=>t.p===p.id).reduce((a,t)=>a+horas(t.f),0);return`<div class="persona"><div class="av" style="background:${COL[p.c]}">${esc(p.n[0])}</div><div class="q"><b>${esc(p.n)}</b><br><span>${h} de ${p.h} h esta semana</span><div class="barra"><i style="width:${Math.min(100,h/p.h*100)}%"></i></div></div><button class="del" data-xp="${p.id}" aria-label="Quitar a ${esc(p.n)}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>`}).join(''):vacio('Aún no hay nadie en el equipo','Añadir persona','persona');
+  }else{
+    $('#vista').innerHTML=`<h2>Tu local</h2><input id="local" value="${esc(D.local||'')}" aria-label="Nombre del local" placeholder="Nombre del local">
+    <h2>Tus datos</h2><div class="fila"><button id="exp">Exportar</button><button id="imp">Importar</button></div><input type="file" id="arch" accept="application/json" hidden>
+    <h2>Empezar de cero</h2><div class="fila"><button id="borrar" style="color:var(--ac)">Borrar todo</button></div>
+    <p style="color:var(--mut);font-size:13px;margin-top:20px">Todo se guarda solo en este móvil. Funciona sin conexión.</p>`;
+    $('#local').onchange=e=>{D.local=e.target.value;guardar();toast('Guardado')};
+    $('#exp').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(D,null,2)],{type:'application/json'}));a.download='turnos.json';a.click();toast('Copia exportada')};
+    $('#imp').onclick=()=>$('#arch').click();
+    $('#arch').onchange=e=>{const f=e.target.files[0];if(!f)return;f.text().then(t=>{try{const n=JSON.parse(t);if(!n.equipo||!n.turnos)throw 0;const ant=D;D=n;guardar();pintar();toast('Datos importados',()=>{D=ant;guardar();pintar()})}catch(x){toast('Ese archivo no es una copia de Turnos Fácil')}})};
+    $('#borrar').onclick=()=>{const ant=D;D={local:'',equipo:[],turnos:[]};guardar();pintar();toast('Todo borrado',()=>{D=ant;guardar();pintar()})};
+  }
+}
+function vacio(t,b,a){return`<div class="vacio"><svg viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="52" fill="var(--sup)"/><rect x="34" y="38" width="52" height="46" rx="10" fill="none" stroke="var(--ac)" stroke-width="4"/><path d="M34 52h52M48 30v14M72 30v14" stroke="var(--ac)" stroke-width="4" stroke-linecap="round"/><circle cx="60" cy="68" r="5" fill="var(--ac2)"/></svg><div>${t}</div><button data-a="${a}">${b}</button></div>`}
+function abrir(html){$('#hoja').innerHTML=html;$('#capa').classList.add('on');setTimeout(()=>$('#hoja').querySelector('input,select,button')?.focus(),250)}
+function cerrar(){$('#capa').classList.remove('on')}
+$('#capa').onclick=e=>{if(e.target.id==='capa')cerrar()};
+addEventListener('keydown',e=>{if(e.key==='Escape')cerrar()});
+function hojaTurno(){
+  if(!D.equipo.length)return hojaPersona();
+  let fr='Mañana';
+  abrir(`<h3 id="hojaTit">Nuevo turno · ${DIAS[dia]}</h3><label for="tp">Persona</label><select id="tp">${D.equipo.map(p=>`<option value="${p.id}">${esc(p.n)}</option>`).join('')}</select>
+  <label>Franja</label><div class="chips">${Object.keys(FRANJAS).map(f=>`<button class="chip ${f===fr?'on':''}" data-f="${f}">${f}<br><small>${FRANJAS[f].join('–')}</small></button>`).join('')}</div>
+  <div class="err" id="err"></div><button class="prim" id="ok">Guardar turno</button>`);
+  $('#hoja').querySelectorAll('.chip').forEach(c=>c.onclick=()=>{fr=c.dataset.f;$('#hoja').querySelectorAll('.chip').forEach(x=>x.classList.toggle('on',x===c))});
+  $('#ok').onclick=()=>{const p=$('#tp').value;if(D.turnos.some(t=>t.s===sem&&t.d===dia&&t.p===p&&t.f===fr))return $('#err').textContent='Esa persona ya tiene ese turno este día.';D.ejemplo=false;D.turnos.push({id:uid(),p,s:sem,d:dia,f:fr});guardar();cerrar();pintar();toast('Turno añadido')};
+}
+function hojaPersona(){
+  abrir(`<h3 id="hojaTit">Nueva persona</h3><label for="pn">Nombre</label><input id="pn" autocomplete="off" maxlength="30">
+  <div class="dos"><div><label for="ph">Horas/semana</label><input id="ph" type="number" inputmode="numeric" value="40" min="1" max="60"></div><div><label>Color</label><div class="chips" id="pc">${COL.map((c,i)=>`<button class="chip ${i===0?'on':''}" data-c="${i}" style="background:${c};border-color:${c};min-width:44px" aria-label="Color ${i+1}"></button>`).join('')}</div></div></div>
+  <div class="err" id="err"></div><button class="prim" id="ok">Añadir al equipo</button>`);
+  let col=0;$('#pc').querySelectorAll('.chip').forEach(b=>b.onclick=()=>{col=+b.dataset.c;$('#pc').querySelectorAll('.chip').forEach(x=>x.style.outline=x===b?'3px solid var(--tx)':'')});
+  $('#ok').onclick=()=>{const n=$('#pn').value.trim(),h=+$('#ph').value;if(!n)return $('#err').textContent='Escribe un nombre.';if(!(h>0&&h<=60))return $('#err').textContent='Las horas deben estar entre 1 y 60.';D.ejemplo=false;D.equipo.push({id:uid(),n,c:col,h});guardar();cerrar();pintar();toast(n+' se ha unido al equipo')};
+}
+document.addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return;const d=b.dataset;
+  if(d.v){vista=d.v;pintar()}
+  else if(d.s){sem+=+d.s;pintar()}
+  else if(d.d){dia=+d.d;pintar()}
+  else if(d.x){const i=D.turnos.findIndex(t=>t.id===d.x),t=D.turnos.splice(i,1)[0];guardar();pintar();toast('Turno quitado',()=>{D.turnos.splice(i,0,t);guardar();pintar()})}
+  else if(d.xp){const i=D.equipo.findIndex(p=>p.id===d.xp),p=D.equipo.splice(i,1)[0],ts=D.turnos.filter(t=>t.p===p.id);D.turnos=D.turnos.filter(t=>t.p!==p.id);guardar();pintar();toast(p.n+' quitado del equipo',()=>{D.equipo.splice(i,0,p);D.turnos.push(...ts);guardar();pintar()})}
+  else if(d.a==='nuevo')hojaTurno();else if(d.a==='persona')hojaPersona();
+});
+$('#fab').onclick=()=>vista==='equipo'?hojaPersona():hojaTurno();
+pintar();
+</script>
+</body>
+</html>
