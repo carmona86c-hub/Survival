@@ -5,7 +5,7 @@ const KEY = 'survival_state_v1', CFG = 'survival_cfg_v1';
 
 const def = () => ({ capitalIni: 1000, gasto: 0, viva: true, oportunidades: [], proyectos: [], firmas: [], diario: [], lecciones: [], fiscal: [], contactos: [], titular: {} });
 let S = Object.assign(def(), load(KEY) || {});
-let C = Object.assign({ key: '', model: 'claude-sonnet-5-5', cap: 1000, pin: 3, pout: 15, min: 10, gh: '', gist: '', par: 3 }, load(CFG) || {});
+let C = Object.assign({ key: '', model: 'claude-sonnet-5-5', cap: 1000, pin: 3, pout: 15, min: 10, gh: '', gist: '', par: 3, autoArranque: true }, load(CFG) || {});
 const DIAS = 864e5;
 let ocupado = false, timer = null, wake = null, syncT = null;
 

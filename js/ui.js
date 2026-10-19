@@ -2,7 +2,7 @@
 async function ciclo() {
   if (ocupado) return;
   if (!S.viva) { msg('Está apagada: se quedó sin capital. Reinicia en Ajustes.'); return; }
-  ocupado = true; $('bCiclo').disabled = true;
+  ocupado = true; $('bCiclo').disabled = true; S.ultimoCiclo = Date.now();
   try {
     const par = Math.max(1, C.par || 3);
     const tareas = tareasComerciales().slice(0, par);
@@ -34,14 +34,17 @@ async function ciclo() {
   ocupado = false; $('bCiclo').disabled = false; save(); pintar();
 }
 
-function pararAuto() { clearInterval(timer); timer = null; $('bAuto').textContent = 'Modo continuo: OFF'; try { wake?.release(); } catch (e) {} wake = null; }
-async function toggleAuto() {
-  if (timer) return pararAuto();
+function pararAuto() { clearInterval(timer); timer = null; $('bAuto').textContent = 'Modo continuo: OFF'; try { wake?.release(); } catch (e) {} wake = null; pintarEstado(); }
+async function iniciarAuto() {
+  if (timer) return;
   timer = setInterval(ciclo, Math.max(1, C.min) * 60000);
   $('bAuto').textContent = 'Modo continuo: ON';
-  try { wake = await navigator.wakeLock?.request('screen'); } catch (e) {}
+  try { wake = await navigator.wakeLock?.request('screen'); } catch (e) {} // pantalla siempre encendida mientras trabaja
+  pintarEstado();
   ciclo();
 }
+function toggleAuto() { if (timer) pararAuto(); else iniciarAuto(); }
+function pintarEstado() { if ($('sEstado')) $('sEstado').innerHTML = S.viva ? (timer ? '<span class="ok">Trabajando</span>' : 'En pausa') : '<span class="b">Apagada</span>'; }
 
 // ---------- Hacienda ----------
 async function borradorFiscal() {
@@ -224,6 +227,7 @@ pintarTit();
 $('cSave').onclick = () => {
   document.querySelectorAll('[data-tit]').forEach(i => S.titular[i.dataset.tit] = i.value.trim());
   C.par = Math.min(6, Math.max(1, +$('cPar').value || 3));
+  C.autoArranque = $('cAuto').checked;
   C.gh = $('cGh').value.trim(); C.gist = $('cGist').value.trim();
   C.key = $('cKey').value.trim(); C.model = $('cModel').value.trim(); C.cap = +$('cCap').value; C.pin = +$('cPin').value; C.pout = +$('cPout').value; C.min = +$('cMin').value;
   if (!S.diario.length) S.capitalIni = C.cap; save(); pintar(); msg('Ajustes guardados');
@@ -233,6 +237,14 @@ $('cExp').onclick = () => { const a = document.createElement('a'); a.href = URL.
 document.addEventListener('visibilitychange', async () => {
   if (document.visibilityState !== 'visible') return;
   if (!ocupado) bajarSync();
-  if (timer) try { wake = await navigator.wakeLock?.request('screen'); } catch (e) {}
+  if (timer) {
+    try { wake = await navigator.wakeLock?.request('screen'); } catch (e) {}
+    // Al volver a la app: si ha pasado el intervalo mientras estaba en segundo plano, se pone al día.
+    if (!ocupado && Date.now() - (S.ultimoCiclo || 0) > Math.max(1, C.min) * 60000) ciclo();
+  }
 });
+$('cAuto').checked = C.autoArranque !== false;
 pintar(); bajarSync();
+// Arranque automático: en cuanto se abre la app, se pone a trabajar (si tiene clave y le queda capital).
+if (C.autoArranque !== false && C.key && S.viva) setTimeout(iniciarAuto, 1500);
+else if (C.autoArranque !== false && !C.key) msg('Pon tu clave de Anthropic en Ajustes y empezará a trabajar sola al abrirla.');
