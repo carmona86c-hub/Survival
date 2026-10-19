@@ -78,9 +78,23 @@ function pintarID() {
   }).join('') : 'Aún no ha estudiado ninguna oportunidad.';
 }
 
+function tarjetaApp(p) {
+  const a = p.app, est = a.estado || (a.repo ? 'aprobada' : 'por_revisar'), n = a.pruebas?.at(-1)?.notas;
+  const ET = { por_revisar: ['w', 'pendiente de que la veas'], aprobada: ['ok', 'aprobada por ti'] };
+  return `<div class="appcard"><div class="row"><span class="tag ok">📱 ${esc(a.nombre)} · v${a.version || 1}</span><span class="tag ${ET[est]?.[0] || ''}">${esc(ET[est]?.[1] || est)}</span>${a.diseno?.personalidad ? `<span class="tag">${esc(a.diseno.personalidad)}</span>` : ''}</div>
+    ${a.diseno?.concepto ? `<div class="mut">${esc(a.diseno.concepto)}</div>` : ''}
+    ${n ? `<div class="notas">${['visual', 'usabilidad', 'detalle', 'practica'].map(k => `<span class="nota ${+n[k] >= NOTA_MINIMA ? 'ok' : 'w'}"><b>${+n[k] || '–'}</b>${{ visual: 'visual', usabilidad: 'uso', detalle: 'detalle', practica: 'práctica' }[k]}</span>`).join('')}</div>` : ''}
+    <div class="row" style="margin-top:8px"><button data-ver="${p.id}">👁 Ver app</button>
+      ${est === 'por_revisar' ? `<button class="sec" data-aprobar="${p.id}">✔ Aprobar${C.gh ? ' y subir' : ''}</button>` : ''}
+      <button class="sec" data-zip="${p.id}">Descargar ZIP</button>
+      ${a.repo ? `<a class="tag" href="${esc(a.repo)}" target="_blank">Ver repo</a>` : est === 'aprobada' && C.gh ? `<button class="sec" data-up="${p.id}">Subir a GitHub</button>` : ''}</div>
+    <div class="row" style="margin-top:6px"><input data-mej="${p.id}" placeholder="Pídele cambios a la app: «más colorida», «añade gráficas»…" style="flex:1;min-width:160px"><button class="sec" data-mejorar="${p.id}">Rehacer app</button></div>
+    ${(a.cambios || []).length ? `<div class="mut">Cambios pedidos: ${a.cambios.map(c => esc(c.instruccion)).join(' · ')}</div>` : ''}</div>`;
+}
+
 function pintar() {
   const ae = document.activeElement;
-  const enEdicion = ae && /^(INPUT|TEXTAREA)$/.test(ae.tagName) && ae.closest?.('#lCo,#lFi');
+  const enEdicion = ae && /^(INPUT|TEXTAREA)$/.test(ae.tagName) && ae.closest?.('#lCo,#lFi,#lPr');
   if (enEdicion) { pintarID(); return; } // no tocar lo que el dueño está editando
   pintarID();
   const cap = S.capitalIni - S.gasto;
@@ -94,7 +108,7 @@ function pintar() {
 
   $('lPr').innerHTML = S.proyectos.length ? S.proyectos.slice().reverse().map(p => `<div class="item"><b>${esc(p.titulo)}</b> <span class="tag">${esc(p.estado)}${p.valoracion ? ' · ' + esc(p.valoracion) : ''}</span>
     <div class="mut">Paso ${Math.min(p.paso + 1, p.plan.pasos.length)} de ${p.plan.pasos.length} · ${esc(p.plan.objetivo)}</div>
-    ${p.app ? `<div class="row" style="margin:6px 0"><span class="tag ok">📱 ${esc(p.app.nombre)}</span><button class="sec" data-zip="${p.id}">Descargar ZIP</button>${p.app.repo ? `<a class="tag" href="${esc(p.app.repo)}" target="_blank">Ver repo</a>` : `<button class="sec" data-up="${p.id}">Subir a GitHub</button>`}</div>` : ''}
+    ${p.app ? tarjetaApp(p) : ''}
     ${p.entregables.map(e => `<details><summary>${esc(e.paso)} — ${esc(e.resumen)}</summary>${e.contenido ? `<pre>${esc(e.contenido)}</pre>` : ''}</details>`).join('')}</div>`).join('') : 'Ninguno todavía.';
 
   $('lFi').innerHTML = S.firmas.length ? S.firmas.slice().reverse().map(f => `<div class="item"><b>${esc(f.titulo)}</b> <span class="tag ${f.estado === 'pendiente' ? 'w' : 'ok'}">${esc(f.estado)}</span>
@@ -152,10 +166,28 @@ $('lFi').onclick = e => {
   }
   f.estado = a; log('firma', f.titulo + ': ' + f.estado); save(); pintar();
 };
-$('lPr').onclick = async e => {
-  const p = S.proyectos.find(x => x.id === (e.target.dataset.zip || e.target.dataset.up)); if (!p) return;
-  try { if (e.target.dataset.zip) await zipApp(p); else { e.target.disabled = true; await subirApp(p); } } catch (err) { msg('Error: ' + err.message); e.target.disabled = false; }
-};
+async function accionApp(d, boton, entrada) {
+  const id = d.zip || d.up || d.ver || d.aprobar || d.mejorar; const p = S.proyectos.find(x => x.id === id); if (!p) return;
+  try {
+    if (d.ver) return verApp(p);
+    if (d.zip) return await zipApp(p);
+    boton.disabled = true;
+    if (d.up) await subirApp(p);
+    else if (d.aprobar) { await aprobarApp(p); cerrarVisor(); msg(`«${p.app.nombre}» aprobada${p.app.repo ? ' y subida' : ''}. Tienes la publicación en Firmas.`); }
+    else if (d.mejorar) {
+      const ins = (entrada || document.querySelector(`[data-mej="${p.id}"]`))?.value.trim(); if (!ins) { boton.disabled = false; return; }
+      await mejorarApp(p, ins); save(); pintar(); msg(`Cambios aplicados: «${p.app.nombre}» v${p.app.version}`);
+      if (!$('visor').classList.contains('hide')) verApp(p);
+    }
+  } catch (err) { msg('Error: ' + err.message); }
+  boton.disabled = false; save(); pintar();
+}
+$('lPr').onclick = e => { const d = e.target.dataset; if (d.zip || d.up || d.ver || d.aprobar || d.mejorar) accionApp(d, e.target); };
+$('visorCerrar').onclick = cerrarVisor;
+$('visorCompleta').onclick = () => $('visor').classList.toggle('completa');
+$('visorAprobar').onclick = e => accionApp({ aprobar: $('visor').dataset.pr }, e.target);
+$('visorRehacer').onclick = e => accionApp({ mejorar: $('visor').dataset.pr }, e.target, $('visorPedir'));
+addEventListener('keydown', e => { if (e.key === 'Escape' && !$('visor').classList.contains('hide')) cerrarVisor(); });
 $('cSync').onclick = conectarSync;
 // Guarda las ediciones del dueño en cuanto escribe (no se pierden si la pantalla se refresca).
 document.addEventListener('input', e => {
