@@ -69,15 +69,26 @@ async function procesarRespuesta(c) {
 Historial enviado: ${JSON.stringify(c.mensajes)}
 Su respuesta: ${resp.texto}
 Analiza su interés y prepara TODO lo necesario para el siguiente paso: la respuesta por correo y, si hay interés, los documentos (presupuesto detallado con IVA, contrato de prestación de servicios, o factura conforme a la normativa española) con los datos del dueño. Si piden no recibir más mensajes, marca baja.
-Devuelve JSON: {"interes":"alto|medio|bajo|baja","analisis","siguiente_paso","respuesta":{"asunto","cuerpo"}|null,"documentos":[{"titulo","tipo":"presupuesto|contrato|factura|otro","contenido"}]}`, { max: 8000 });
+En una factura escribe exactamente [NUM_FACTURA] donde vaya el número (se numera sola) y rellena "factura" con sus importes reales acordados; la retención de IRPF solo si el cliente es empresa o profesional y la actividad la lleva (si no, 0).
+Devuelve JSON: {"interes":"alto|medio|bajo|baja","analisis","siguiente_paso","respuesta":{"asunto","cuerpo"}|null,"documentos":[{"titulo","tipo":"presupuesto|contrato|factura|otro","contenido","factura":{"concepto","cliente","nif_cliente","base_eur":número,"iva_pct":número,"retencion_pct":número}|null}]}`, { max: 8000 });
   resp.procesada = true; resp.analisis = r.analisis;
   if (r.interes === 'baja') { c.estado = 'baja'; log('comercial', `${c.empresa} pidió no recibir más mensajes`); return; }
   const pr = S.proyectos.find(p => p.id === c.prId);
   const [v] = r.respuesta ? await verificar([r.respuesta], (pr ? contextoPr(pr) : c.proyecto) + ' · Lo que ha dicho el cliente: ' + resp.texto) : [];
   if (v) { c.mensajes.push({ tipo: 'respuesta', ...v }); c.estado = 'borrador'; }
   else c.estado = r.interes === 'bajo' ? 'descartado' : 'en_conversacion';
-  (r.documentos || []).forEach(d => S.firmas.push({ id: uid(), prId: c.prId, estado: 'pendiente', titulo: `${d.titulo} · ${c.empresa}`, que_firmar: d.tipo, donde: c.empresa, documento: d.contenido }));
-  if (/factura/i.test(JSON.stringify(r.documentos || []))) log('hacienda', `Factura preparada para ${c.empresa}: regístrala en Hacienda cuando cobres`);
+  (r.documentos || []).forEach(d => {
+    const f = { id: uid(), prId: c.prId, estado: 'pendiente', titulo: `${d.titulo} · ${c.empresa}`, que_firmar: d.tipo, donde: c.empresa, documento: d.contenido || '' };
+    if (d.tipo === 'factura' && d.factura && +d.factura.base_eur > 0) {
+      const num = siguienteNumFactura(new Date().getFullYear());
+      f.factura = { ...d.factura, cliente: d.factura.cliente || c.empresa, num };
+      f.documento = f.documento.split('[NUM_FACTURA]').join(num);
+      f.titulo = `Factura ${num} · ${c.empresa}`;
+      f.que_firmar = 'factura: al darle conformidad se apunta sola como venta en Hacienda';
+      log('hacienda', `Factura ${num} preparada para ${c.empresa}`);
+    }
+    S.firmas.push(f);
+  });
   log('comercial', `${c.empresa}: interés ${r.interes}. ${r.siguiente_paso || ''}`);
 }
 
